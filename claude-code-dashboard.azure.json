@@ -36,8 +36,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -90,13 +90,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum(increase(claude_code_session_count_total[1h]))",
-          "interval": "",
-          "legendFormat": "Sessions (1h)",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.session.count\"\n| summarize Sessions = sum(Sum)",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A",
+          "legendFormat": "Sessions"
         }
       ],
       "title": "Active Sessions (1h)",
@@ -104,8 +108,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -158,13 +162,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum(increase(claude_code_cost_usage_USD_total[1h]))",
-          "interval": "",
-          "legendFormat": "Cost (1h)",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.cost.usage\"\n| summarize Cost = sum(Sum)",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A",
+          "legendFormat": "Cost"
         }
       ],
       "title": "Cost (Last Hour)",
@@ -172,8 +180,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -226,13 +234,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum(increase(claude_code_token_usage_tokens_total[1h]))",
-          "interval": "",
-          "legendFormat": "Tokens (1h)",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.token.usage\"\n| summarize Tokens = sum(Sum)",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A",
+          "legendFormat": "Tokens"
         }
       ],
       "title": "Token Usage (1h)",
@@ -240,8 +252,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -294,13 +306,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total[1h]))",
-          "interval": "",
-          "legendFormat": "Lines Changed (1h)",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| summarize Lines = sum(Sum)",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A",
+          "legendFormat": "Lines"
         }
       ],
       "title": "Lines of Code (1h)",
@@ -319,8 +335,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -397,13 +413,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total[1h]))",
-          "interval": "",
-          "legendFormat": "{{model}}",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.cost.usage\"\n| extend p = parse_json(Properties)\n| summarize Cost = sum(Sum) by model = tostring(p.model), bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "{{model}}"
         }
       ],
       "title": "Cost by Model (Hourly)",
@@ -411,8 +431,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -567,13 +587,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum by (type) (rate(claude_code_token_usage_tokens_total[5m]) * 60)",
-          "interval": "",
-          "legendFormat": "{{type}}",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.token.usage\"\n| extend p = parse_json(Properties)\n| summarize Tokens = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "{{type}}"
         }
       ],
       "title": "Token Usage Rate by Type",
@@ -581,8 +605,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -699,13 +723,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum by (model) (changes(claude_code_cost_usage_USD_total[5m]))",
-          "interval": "",
-          "legendFormat": "{{model}}",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_request\"\n| summarize Requests = count() by model = tostring(Properties['model']), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "{{model}}"
         }
       ],
       "title": "API Requests by Model (5min rate)",
@@ -1370,8 +1398,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1447,13 +1475,17 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum by (type) (rate(claude_code_lines_of_code_count_total[5m]) * 60)",
-          "interval": "",
-          "legendFormat": "{{type}} lines/min",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend p = parse_json(Properties)\n| summarize Lines = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "{{type}}"
         }
       ],
       "title": "Code Changes Rate",
@@ -1461,8 +1493,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1538,23 +1570,31 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum(increase(claude_code_commit_count_total[1h])) or vector(0)",
-          "interval": "",
-          "legendFormat": "Commits",
-          "refId": "A"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| summarize Commits = sum(Sum) by bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "Commits"
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
           },
-          "expr": "sum(increase(claude_code_pull_request_count_total[1h])) or vector(0)",
-          "interval": "",
-          "legendFormat": "Pull Requests",
-          "refId": "B"
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| summarize PRs = sum(Sum) by bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "B",
+          "legendFormat": "Pull Requests"
         }
       ],
       "title": "Development Activity (Hourly)",
@@ -1728,17 +1768,9 @@
   "version": 1,
   "__inputs": [
     {
-      "name": "DS_PROMETHEUS",
-      "label": "Azure Monitor Managed Prometheus",
-      "description": "Prometheus data source pointing at the Azure Monitor Workspace.",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    },
-    {
       "name": "DS_AZURE_MONITOR",
       "label": "Azure Monitor",
-      "description": "Azure Monitor data source with access to the Log Analytics workspace containing ClaudeCodeEvents_CL.",
+      "description": "Azure Monitor data source with access to the Log Analytics workspace containing AppMetrics + AppTraces.",
       "type": "datasource",
       "pluginId": "grafana-azure-monitor-datasource",
       "pluginName": "Azure Monitor"
@@ -1750,12 +1782,6 @@
       "id": "grafana",
       "name": "Grafana",
       "version": "10.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
     },
     {
       "type": "datasource",

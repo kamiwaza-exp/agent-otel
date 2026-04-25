@@ -1,34 +1,169 @@
 #!/usr/bin/env python3
 """Generate claude-code-dashboard.azure.json from the local dashboard."""
 
-import json
 import copy
-import re
+import json
 from pathlib import Path
 
 SRC = Path("/Users/jxstanford/devel/kz/agent-otel/claude-code-dashboard.json")
 DST = Path("/Users/jxstanford/devel/kz/agent-otel/claude-code-dashboard.azure.json")
 
-PROM_DS = {"type": "prometheus", "uid": "${DS_PROMETHEUS}"}
+# Single datasource for the Azure port: all panels (metrics + logs + events)
+# query Log Analytics via the Azure Monitor data source. The original split
+# (Prometheus + Azure Monitor) was collapsed when we unified metrics onto
+# App Insights / AppMetrics.
 AZURE_DS = {"type": "grafana-azure-monitor-datasource", "uid": "${DS_AZURE_MONITOR}"}
 LA_RESOURCE_VAR = "$law_resource"
 
-# Local Prometheus assigns `job="otel-collector"` via its scrape config.
-# Azure Managed Prometheus receives via remote-write — no scrape, no job label.
-# Selectors that hard-code that label match zero series on Azure, so strip them
-# during the port. Two shapes to handle:
-#   {job="otel-collector"}              → drop the whole brace block
-#   {foo="bar",job="otel-collector"}    → remove just the job clause
-_JOB_ONLY_SELECTOR = re.compile(r'\{\s*job\s*=\s*"otel-collector"\s*\}')
-_JOB_WITH_OTHERS = re.compile(
-    r',\s*job\s*=\s*"otel-collector"|job\s*=\s*"otel-collector"\s*,'
-)
 
-
-def strip_job_selector(expr: str) -> str:
-    """Remove the {job="otel-collector"} selector from a PromQL expression."""
-    expr = _JOB_ONLY_SELECTOR.sub("", expr)
-    return _JOB_WITH_OTHERS.sub("", expr)
+# KQL rewrites for what used to be Prometheus-source panels. The Azure port
+# originally split metrics (Managed Prometheus via prometheusremotewrite) and
+# logs (App Insights). PRW + the alpha azureauthextension didn't work from
+# Container Apps, so we unified on App Insights for both signals. Metrics now
+# land in `AppMetrics`, query shape differs from PromQL:
+#   - Each row has `Name`, `Sum`, `ItemCount`, and `Properties` (JSON string).
+#   - `Sum` is the delta for that row's interval; `sum(Sum)` over a window =
+#     running total (equivalent to `increase()` in PromQL).
+#   - Labels live inside Properties — parse with `parse_json(Properties)`.
+#
+# Each entry is a list of target specs so multi-target panels (e.g., id=12
+# Development Activity with separate commits + PRs series) work uniformly.
+METRICS_KQL_BY_PANEL_ID = {
+    # Overview stat panels — single-value output
+    1: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.session.count"\n'
+                "| summarize Sessions = sum(Sum)"
+            ),
+            "resultFormat": "table",
+            "legendFormat": "Sessions",
+        }
+    ],
+    2: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.cost.usage"\n'
+                "| summarize Cost = sum(Sum)"
+            ),
+            "resultFormat": "table",
+            "legendFormat": "Cost",
+        }
+    ],
+    3: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.token.usage"\n'
+                "| summarize Tokens = sum(Sum)"
+            ),
+            "resultFormat": "table",
+            "legendFormat": "Tokens",
+        }
+    ],
+    4: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.lines_of_code.count"\n'
+                "| summarize Lines = sum(Sum)"
+            ),
+            "resultFormat": "table",
+            "legendFormat": "Lines",
+        }
+    ],
+    # Cost & Usage charts
+    5: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.cost.usage"\n'
+                "| extend p = parse_json(Properties)\n"
+                "| summarize Cost = sum(Sum) by model = tostring(p.model), bin(TimeGenerated, 1h)\n"
+                "| order by TimeGenerated asc"
+            ),
+            "resultFormat": "time_series",
+            "legendFormat": "{{model}}",
+        }
+    ],
+    6: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.token.usage"\n'
+                "| extend p = parse_json(Properties)\n"
+                "| summarize Tokens = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n"
+                "| order by TimeGenerated asc"
+            ),
+            "resultFormat": "time_series",
+            "legendFormat": "{{type}}",
+        }
+    ],
+    # API Requests by Model — use AppTraces events, not AppMetrics (the original
+    # PromQL hack of `changes(cost.usage)` is replaced with a clean event count).
+    15: [
+        {
+            "query": (
+                "AppTraces\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                "| where tostring(Properties['event.name']) == \"api_request\"\n"
+                "| summarize Requests = count() by model = tostring(Properties['model']), bin(TimeGenerated, 5m)\n"
+                "| order by TimeGenerated asc"
+            ),
+            "resultFormat": "time_series",
+            "legendFormat": "{{model}}",
+        }
+    ],
+    11: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.lines_of_code.count"\n'
+                "| extend p = parse_json(Properties)\n"
+                "| summarize Lines = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n"
+                "| order by TimeGenerated asc"
+            ),
+            "resultFormat": "time_series",
+            "legendFormat": "{{type}}",
+        }
+    ],
+    # Development Activity — two targets (commits + PRs) on one panel
+    12: [
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.commit.count"\n'
+                "| summarize Commits = sum(Sum) by bin(TimeGenerated, 1h)\n"
+                "| order by TimeGenerated asc"
+            ),
+            "resultFormat": "time_series",
+            "legendFormat": "Commits",
+            "refId": "A",
+        },
+        {
+            "query": (
+                "AppMetrics\n"
+                "| where $__timeFilter(TimeGenerated)\n"
+                '| where Name == "claude_code.pull_request.count"\n'
+                "| summarize PRs = sum(Sum) by bin(TimeGenerated, 1h)\n"
+                "| order by TimeGenerated asc"
+            ),
+            "resultFormat": "time_series",
+            "legendFormat": "Pull Requests",
+            "refId": "B",
+        },
+    ],
+}
 
 
 # KQL rewrites keyed by panel id, from docs/azure-kql-panels.md.
@@ -279,14 +414,34 @@ def rewrite_panel(panel: dict) -> dict:
     ds_type = ds.get("type")
 
     if ds_type == "prometheus":
-        # Port: swap datasource UID and strip the local-only job selector
-        # from each target's PromQL expression.
-        p["datasource"] = PROM_DS
-        for t in p.get("targets", []):
-            if isinstance(t.get("datasource"), dict):
-                t["datasource"] = PROM_DS
-            if isinstance(t.get("expr"), str):
-                t["expr"] = strip_job_selector(t["expr"])
+        # Convert Prometheus-source panels to Azure Monitor Logs against
+        # AppMetrics (or AppTraces for event-count panels). The Azure port
+        # no longer uses Managed Prometheus because prometheusremotewrite
+        # + azureauth was unreliable from Container Apps.
+        pid = p.get("id")
+        if not isinstance(pid, int) or pid not in METRICS_KQL_BY_PANEL_ID:
+            raise RuntimeError(
+                f"Prometheus panel {pid} ({p.get('title')}) missing AppMetrics KQL mapping"
+            )
+        p["datasource"] = AZURE_DS
+        p["targets"] = [
+            {
+                "datasource": AZURE_DS,
+                "queryType": "Azure Log Analytics",
+                "azureLogAnalytics": {
+                    "query": spec["query"],
+                    "resource": LA_RESOURCE_VAR,
+                    "resultFormat": spec["resultFormat"],
+                },
+                "refId": spec.get("refId", chr(ord("A") + i)),
+                **(
+                    {"legendFormat": spec["legendFormat"]}
+                    if spec.get("legendFormat")
+                    else {}
+                ),
+            }
+            for i, spec in enumerate(METRICS_KQL_BY_PANEL_ID[pid])
+        ]
         return p
 
     if ds_type == "loki":
@@ -348,19 +503,13 @@ def main():
     dst["version"] = 1
 
     # Declare plugin + datasource requirements so import prompts correctly.
+    # Single Azure Monitor data source now covers both AppMetrics queries
+    # (metrics panels) and AppTraces queries (log/event panels).
     dst["__inputs"] = [
-        {
-            "name": "DS_PROMETHEUS",
-            "label": "Azure Monitor Managed Prometheus",
-            "description": "Prometheus data source pointing at the Azure Monitor Workspace.",
-            "type": "datasource",
-            "pluginId": "prometheus",
-            "pluginName": "Prometheus",
-        },
         {
             "name": "DS_AZURE_MONITOR",
             "label": "Azure Monitor",
-            "description": "Azure Monitor data source with access to the Log Analytics workspace containing ClaudeCodeEvents_CL.",
+            "description": "Azure Monitor data source with access to the Log Analytics workspace containing AppMetrics + AppTraces.",
             "type": "datasource",
             "pluginId": "grafana-azure-monitor-datasource",
             "pluginName": "Azure Monitor",
@@ -368,12 +517,6 @@ def main():
     ]
     dst["__requires"] = [
         {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0"},
-        {
-            "type": "datasource",
-            "id": "prometheus",
-            "name": "Prometheus",
-            "version": "1.0.0",
-        },
         {
             "type": "datasource",
             "id": "grafana-azure-monitor-datasource",

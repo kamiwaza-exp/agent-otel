@@ -5,36 +5,21 @@
 #
 # Data flow:
 #   OTLP in (4317/4318)
-#     ├─ metrics → prometheusremotewrite → Azure Monitor Workspace DCE (Managed Prometheus, Entra-auth via Managed Identity)
-#     └─ logs    → azuremonitor          → Application Insights (workspace-based, lands in LA workspace)
+#     ├─ metrics → azuremonitor → Application Insights → AppMetrics table in LA
+#     └─ logs    → azuremonitor → Application Insights → AppTraces  table in LA
 #
-# Auth:
-#   - Metrics: User-assigned Managed Identity → Monitoring Metrics Publisher on the metrics DCR
-#   - Logs:    Application Insights connection string (embeds an instrumentation key)
+# Both signals share the same exporter and the same connection-string auth.
+# No Managed Identity, no DCE, no azureauth extension — this was originally a
+# split design with metrics going to Managed Prometheus via prometheusremotewrite
+# + azureauth, but the azureauth extension (flagged Alpha in otel-contrib)
+# consistently hangs token fetch from inside Azure Container Apps, causing
+# every metric batch to time out. The logs path worked from day one with
+# connection-string auth, so we unified on it.
 #
 # Expected environment variables (set by the Container App):
-#   AZURE_CLIENT_ID                          — client ID of the attached user-assigned MI (used by azureauth extension)
-#   AZURE_MONITOR_METRICS_ENDPOINT           — full PRW URL: https://<dce>/dataCollectionRules/<dcr>/streams/Microsoft-PrometheusMetrics/api/v1/write
 #   APPLICATIONINSIGHTS_CONNECTION_STRING    — full AI connection string, e.g. "InstrumentationKey=...;IngestionEndpoint=https://...applicationinsights.azure.com/;..."
 
 extensions:
-  # Managed Identity auth for Azure endpoints, via the azureauthextension.
-  # Available in otel-collector-contrib >= 0.124.0; we pin to 0.140.0 in the
-  # Container App template (older 0.116.x is dynamically linked and broken on
-  # `FROM scratch` images; older still don't have this extension).
-  #
-  # The extension uses IMDS on the Container App to fetch short-lived bearer
-  # tokens for the user-assigned MI, refreshing automatically. No secrets in
-  # config.
-  #
-  # The registered config key is `azureauth` (underscore) — the README and
-  # codebase agree; the no-underscore form silently fails to match.
-  azureauth:
-    managed_identity:
-      # Identity client ID is injected by the Container App at runtime
-      # (AZURE_CLIENT_ID is set automatically when a user-assigned MI is attached).
-      client_id: ${env:AZURE_CLIENT_ID}
-
   health_check:
     endpoint: 0.0.0.0:13133
 
@@ -65,23 +50,13 @@ processors:
         value: "azure-container-apps"
         action: upsert
 
-  # Batching reduces API calls to the DCE. Size/timeout tuned for Claude Code's
-  # typical emission cadence (bursty on session start, sparse otherwise).
+  # Batching reduces API calls to Application Insights. Size/timeout tuned
+  # for Claude Code's typical emission cadence (bursty on session start,
+  # sparse otherwise).
   batch:
     send_batch_size: 1000
     send_batch_max_size: 1500
     timeout: 10s
-
-  # Claude Code (and most OTel SDKs) emit counter-style metrics with Delta
-  # aggregation temporality. Prometheus remote-write requires Cumulative —
-  # without this conversion, PRW logs "invalid temporality and type
-  # combination for metric X" and drops every counter. This processor keeps
-  # a running sum per series so downstream consumers see proper Cumulative
-  # counters.
-  deltatocumulative:
-    # How long a series can go idle before state is dropped. 5m matches the
-    # Claude Code 60s export cadence with plenty of margin.
-    max_stale: 5m
 
   # In-flight secret redaction for log records. Acts on attribute values that
   # carry free-form text (prompt, error). Runs BEFORE export so cleartext never
@@ -223,40 +198,10 @@ processors:
           - 'replace_pattern(attributes["error"], "(?i)\\b(api[_-]?key|apikey|access[_-]?key|secret[_-]?key|secret[_-]?token|auth[_-]?token|access[_-]?token|client[_-]?secret|signing[_-]?key|password|passwd|credential)\\s*[:=]\\s*[A-Za-z0-9+/_.\\-=]{16,}", "$$1=[REDACTED:contextual-secret]")'
 
 exporters:
-  # Managed Prometheus via remote write.
-  # Azure Monitor Workspace DCE accepts Prometheus remote-write protocol on a
-  # URL that embeds the DCR ID and the Microsoft-PrometheusMetrics stream.
-  prometheusremotewrite:
-    endpoint: ${env:AZURE_MONITOR_METRICS_ENDPOINT}
-    auth:
-      authenticator: azureauth
-    # Default timeout 5s → 30s wasn't enough; bumping to 60s. From outside
-    # Azure the DCE responds in ~0.7s, but from inside Container Apps every
-    # request hangs the full timeout window. Suspected azureauth IMDS path
-    # warm-up; once a token is cached subsequent requests should be fast.
-    timeout: 60s
-    # Retry transient errors. Note: prometheusremotewrite wraps timeouts as
-    # "Permanent" errors, which skip the retry path — so this mainly helps
-    # 5xx and connection-reset cases. Worth having anyway.
-    retry_on_failure:
-      enabled: true
-      initial_interval: 5s
-      max_interval: 30s
-      max_elapsed_time: 5m
-    # Include resource attributes as labels on every metric. Without this,
-    # deployment.environment / service.name don't reach Prometheus labels.
-    resource_to_telemetry_conversion:
-      enabled: true
-    remote_write_queue:
-      enabled: true
-      queue_size: 10000
-      num_consumers: 5
-    # Defensive: drop any metric with > 1000 labels to avoid cardinality blowups
-    # from a misconfigured client.
-    max_batch_size_bytes: 3000000
-
   # Application Insights (workspace-based). Data lands in the LA workspace
-  # under the auto-provisioned App* tables (AppTraces / AppEvents).
+  # under the auto-provisioned App* tables:
+  #   metrics → AppMetrics
+  #   logs    → AppTraces
   # The connection string includes the instrumentation key used for auth and
   # the regional ingestion endpoint URL — no separate endpoint config needed.
   azuremonitor:
@@ -266,21 +211,16 @@ exporters:
     # Note: this exporter does not apply its own sampling. The AI resource
     # is configured with SamplingPercentage=100 (no ingestion-side drops).
 
-  # Debug exporter — temporarily wired into logs pipeline to verify what's
-  # making it through redaction. Set verbosity: detailed for full payload.
-  debug:
-    verbosity: detailed
-
 service:
-  extensions: [azureauth, health_check]
+  extensions: [health_check]
   pipelines:
     metrics:
       receivers: [otlp]
-      # deltatocumulative must run BEFORE batch so the running-sum state is
-      # correct per series across batches. Otherwise a batch boundary can
-      # hide/duplicate samples.
-      processors: [memory_limiter, resource, deltatocumulative, batch]
-      exporters: [prometheusremotewrite, debug]
+      # Metrics don't need redaction — they're numeric with structured
+      # attributes. The azuremonitor exporter handles both Delta and
+      # Cumulative temporality without a separate converter.
+      processors: [memory_limiter, resource, batch]
+      exporters: [azuremonitor]
     logs:
       receivers: [otlp]
       # Order: memory_limiter (admission control) → resource (decorate) →
@@ -288,9 +228,7 @@ service:
       # Redaction must happen before batch so individual records are scrubbed
       # before any cross-record grouping; before export so cleartext never leaves.
       processors: [memory_limiter, resource, transform/redact_secrets, batch]
-      # debug exporter is temporary — confirms what's reaching exporters and
-      # helps diagnose missing AppTraces data. Remove once verified.
-      exporters: [azuremonitor, debug]
+      exporters: [azuremonitor]
   telemetry:
     # Collector self-telemetry. Useful when debugging why data isn't flowing.
     logs:
