@@ -208,9 +208,9 @@ Q_ACTIVE_HOSTS_7D = """AppTraces
 
 Q_ACTIVE_PROJECTS_7D = """AppTraces
 | where TimeGenerated > ago(7d)
-| extend project = tostring(Properties['project.name'])
-| where isnotempty(project)
-| summarize count_distinct = dcount(project)
+| extend proj = tostring(Properties['project.name'])
+| where isnotempty(proj)
+| summarize count_distinct = dcount(proj)
 """
 
 Q_DAU_30D = """AppTraces
@@ -259,20 +259,22 @@ Q_ACTIVE_HOURS_BY_USER = """AppTraces
 Q_HOUR_OF_DAY = """AppTraces
 | where TimeGenerated > ago(30d)
 | where tostring(Properties['event.name']) == "user_prompt"
-| extend hour_of_day = datetime_part("hour", TimeGenerated)
-| summarize prompts = count() by hour_of_day
+| extend hour_num = datetime_part("hour", TimeGenerated)
+| summarize prompts = count() by hour_num
+| extend hour_of_day = strcat(iif(hour_num < 10, "0", ""), tostring(hour_num), ":00")
+| project hour_of_day, prompts
 | order by hour_of_day asc
 """
 
 Q_TOP_PROJECTS = """AppTraces
 | where TimeGenerated > ago(7d)
-| extend project = tostring(Properties['project.name'])
-| where isnotempty(project)
+| extend proj = tostring(Properties['project.name'])
+| where isnotempty(proj)
 | summarize
     events = count(),
     users = dcount(tostring(Properties['user.email'])),
     sessions = dcount(tostring(Properties['session.id']))
-  by project
+  by proj
 | order by events desc
 """
 
@@ -299,9 +301,9 @@ Q_COST_BY_PROJECT = """AppMetrics
 | where TimeGenerated > ago(7d)
 | where Name == "claude_code.cost.usage"
 | extend p = parse_json(Properties)
-| extend project = tostring(p['project.name'])
-| where isnotempty(project)
-| summarize Cost = sum(Sum) by project
+| extend proj = tostring(p['project.name'])
+| where isnotempty(proj)
+| summarize Cost = sum(Sum) by proj
 | order by Cost desc
 """
 

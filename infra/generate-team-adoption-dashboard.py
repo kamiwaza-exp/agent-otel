@@ -183,7 +183,7 @@ def barchart_panel(
     }
 
 
-def heatmap_panel(
+def heatmap_table_panel(
     pid: int,
     title: str,
     x: int,
@@ -193,39 +193,54 @@ def heatmap_panel(
     query: str,
     description: str = "",
 ) -> dict:
-    """Hour-of-day × day-of-week heatmap.
+    """Hour×day heatmap rendered as a Table with per-day-column cell coloring.
 
-    Expects KQL output with columns (dow_label, hour_of_day, prompts) — the
-    Grafana heatmap panel will read these as (X, Y, value).
+    Grafana's native Heatmap panel can't read categorical-X data (dow as
+    string + numeric Y), so we lean on the Table panel's cell-color override
+    instead — produces a discrete, GitHub-commit-style grid that's far more
+    reliable. Expects KQL output with columns
+    (hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun) — see Q_HEATMAP_HOUR_DOW
+    for the synthetic-grid + pivot pattern that guarantees all 7 day columns
+    exist even when data is sparse.
     """
+    day_cols = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    overrides: list[dict] = []
+    for col in day_cols:
+        overrides.append(
+            {
+                "matcher": {"id": "byName", "options": col},
+                "properties": [
+                    {
+                        "id": "custom.cellOptions",
+                        "value": {"type": "color-background", "mode": "gradient"},
+                    },
+                    {"id": "color", "value": {"mode": "continuous-BlPu"}},
+                    {"id": "min", "value": 0},
+                    {"id": "custom.align", "value": "center"},
+                ],
+            }
+        )
+    overrides.append(
+        {
+            "matcher": {"id": "byName", "options": "hour_of_day"},
+            "properties": [
+                {"id": "custom.align", "value": "right"},
+                {"id": "custom.width", "value": 90},
+            ],
+        }
+    )
     return {
         "id": pid,
-        "type": "heatmap",
+        "type": "table",
         "title": title,
         "description": description,
         "datasource": AZURE_DS,
         "gridPos": {"x": x, "y": y, "w": w, "h": h},
         "fieldConfig": {
-            "defaults": {"custom": {"scaleDistribution": {"type": "linear"}}},
-            "overrides": [],
+            "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}}},
+            "overrides": overrides,
         },
-        "options": {
-            "calculate": False,
-            "color": {
-                "scheme": "Spectral",
-                "fill": "dark-blue",
-                "mode": "scheme",
-                "steps": 64,
-                "reverse": True,
-                "exponent": 0.5,
-            },
-            "yAxis": {"axisPlacement": "left", "reverse": False, "unit": "short"},
-            "rowsFrame": {"layout": "auto"},
-            "tooltip": {"show": True, "yHistogram": False},
-            "legend": {"show": True},
-            "exemplars": {"color": "rgba(255,0,255,0.7)"},
-            "filterValues": {"le": 1e-09},
-        },
+        "options": {"showHeader": True, "footer": {"show": False}},
         "targets": [kql_target(query, "table")],
     }
 
@@ -281,30 +296,38 @@ Q_DAU_WAU_MAU = f"""AppTraces
 | order by TimeGenerated asc
 """
 
-Q_HEATMAP_HOUR_DOW = f"""AppTraces
-| where TimeGenerated > ago(30d)
-{USER_FILTER}
-| where tostring(Properties['event.name']) == "user_prompt"
-| extend hour_of_day = datetime_part("hour", TimeGenerated)
-| extend dow_idx = case(
-    dayofweek(TimeGenerated) == 0d, 6,  // Sun → last
-    dayofweek(TimeGenerated) == 1d, 0,  // Mon → first
-    dayofweek(TimeGenerated) == 2d, 1,
-    dayofweek(TimeGenerated) == 3d, 2,
-    dayofweek(TimeGenerated) == 4d, 3,
-    dayofweek(TimeGenerated) == 5d, 4,
-    5)                                   // Sat
-| extend dow = case(
-    dow_idx == 0, "Mon",
-    dow_idx == 1, "Tue",
-    dow_idx == 2, "Wed",
-    dow_idx == 3, "Thu",
-    dow_idx == 4, "Fri",
-    dow_idx == 5, "Sat",
-    "Sun")
-| summarize prompts = count() by dow, hour_of_day, dow_idx
-| order by dow_idx asc, hour_of_day asc
-| project dow, hour_of_day, prompts
+Q_HEATMAP_HOUR_DOW = f"""// Synthesize a full 24×7 grid first so the pivot output always has all
+// seven day columns even when actual data is sparse (otherwise pivot
+// drops missing days and the table panel renders fewer columns).
+let _grid = range hour_of_day from 0 to 23 step 1
+  | extend _j = 1
+  | join kind=fullouter (
+      datatable(dow_idx:int, dow_label:string)
+        [0,"Mon", 1,"Tue", 2,"Wed", 3,"Thu", 4,"Fri", 5,"Sat", 6,"Sun"]
+      | extend _j = 1
+    ) on _j
+  | project hour_of_day, dow_idx, dow_label;
+let _actual = AppTraces
+  | where TimeGenerated > ago(30d)
+  {USER_FILTER}
+  | where tostring(Properties['event.name']) == "user_prompt"
+  | extend hour_of_day = datetime_part("hour", TimeGenerated)
+  | extend dow_idx = case(
+      dayofweek(TimeGenerated) == 0d, 6,
+      dayofweek(TimeGenerated) == 1d, 0,
+      dayofweek(TimeGenerated) == 2d, 1,
+      dayofweek(TimeGenerated) == 3d, 2,
+      dayofweek(TimeGenerated) == 4d, 3,
+      dayofweek(TimeGenerated) == 5d, 4,
+      5)
+  | summarize prompts = count() by hour_of_day, dow_idx;
+_grid
+| join kind=leftouter _actual on hour_of_day, dow_idx
+| extend prompts = coalesce(prompts, long(0))
+| project hour_of_day, dow_label, prompts
+| evaluate pivot(dow_label, sum(prompts))
+| project hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun
+| order by hour_of_day asc
 """
 
 # Lapsed = had at least one prompt in the dashboard window but no prompt in
@@ -384,9 +407,9 @@ Q_DISTINCT_PROJECTS_PER_USER = f"""AppTraces
 | where $__timeFilter(TimeGenerated)
 {USER_FILTER}
 | extend email = tostring(Properties['user.email'])
-| extend project = tostring(Properties['project.name'])
-| where isnotempty(email) and isnotempty(project)
-| summarize projects = make_set(project), distinct_projects = dcount(project) by email
+| extend proj = tostring(Properties['project.name'])
+| where isnotempty(email) and isnotempty(proj)
+| summarize projects = make_set(proj), distinct_projects = dcount(proj) by email
 | project email, distinct_projects, projects
 | order by distinct_projects desc
 """
@@ -528,7 +551,7 @@ panels.append(
 # Rhythm
 panels.append(row("⏱  Rhythm", y=13))
 panels.append(
-    heatmap_panel(
+    heatmap_table_panel(
         next_id(),
         "Prompt rhythm — hour-of-day × day-of-week (last 30d)",
         0,
@@ -536,7 +559,7 @@ panels.append(
         24,
         10,
         Q_HEATMAP_HOUR_DOW,
-        description="Cell = count of user_prompt events at that hour on that weekday across the last 30 days. Aggregated across selected users (use $users to filter).",
+        description="Cell = count of user_prompt events at that hour on that weekday across the last 30 days. Aggregated across selected users (use $users to filter). Table-with-cell-coloring renders categorical-X heatmaps reliably where Grafana's native heatmap panel can't.",
     )
 )
 

@@ -282,9 +282,9 @@
     },
     {
       "id": 305,
-      "type": "heatmap",
+      "type": "table",
       "title": "Hour-of-day \u00d7 day-of-week (last 90d)",
-      "description": "When this user submits prompts, last 90 days. Cell = count of user_prompt events at that hour on that weekday.",
+      "description": "When this user submits prompts, last 90 days. Cell = count of user_prompt events at that hour on that weekday. Pivoted into a 24-row \u00d7 7-col table with cell-color shading; Grafana's native heatmap panel can't render categorical-X data.",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "${DS_AZURE_MONITOR}"
@@ -298,43 +298,238 @@
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "scaleDistribution": {
-              "type": "linear"
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
             }
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mon"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tue"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Wed"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Thu"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fri"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sat"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sun"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-BlPu"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "hour_of_day"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          }
+        ]
       },
       "options": {
-        "calculate": false,
-        "color": {
-          "scheme": "Spectral",
-          "fill": "dark-blue",
-          "mode": "scheme",
-          "steps": 64,
-          "reverse": true,
-          "exponent": 0.5
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "reverse": false,
-          "unit": "short"
-        },
-        "rowsFrame": {
-          "layout": "auto"
-        },
-        "tooltip": {
-          "show": true,
-          "yHistogram": false
-        },
-        "legend": {
-          "show": true
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-09
+        "showHeader": true,
+        "footer": {
+          "show": false
         }
       },
       "targets": [
@@ -345,7 +540,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where TimeGenerated > ago(90d)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend hour_of_day = datetime_part(\"hour\", TimeGenerated)\n| extend dow_idx = case(\n    dayofweek(TimeGenerated) == 0d, 6,\n    dayofweek(TimeGenerated) == 1d, 0,\n    dayofweek(TimeGenerated) == 2d, 1,\n    dayofweek(TimeGenerated) == 3d, 2,\n    dayofweek(TimeGenerated) == 4d, 3,\n    dayofweek(TimeGenerated) == 5d, 4,\n    5)\n| extend dow = case(\n    dow_idx == 0, \"Mon\", dow_idx == 1, \"Tue\", dow_idx == 2, \"Wed\",\n    dow_idx == 3, \"Thu\", dow_idx == 4, \"Fri\", dow_idx == 5, \"Sat\", \"Sun\")\n| summarize prompts = count() by dow, hour_of_day, dow_idx\n| order by dow_idx asc, hour_of_day asc\n| project dow, hour_of_day, prompts\n",
+            "query": "// Same synthetic-grid + pivot pattern as the team adoption dashboard:\n// build a full 24\u00d77 grid first so the table panel always has all seven\n// day columns, even when the user's data is sparse.\nlet _grid = range hour_of_day from 0 to 23 step 1\n  | extend _j = 1\n  | join kind=fullouter (\n      datatable(dow_idx:int, dow_label:string)\n        [0,\"Mon\", 1,\"Tue\", 2,\"Wed\", 3,\"Thu\", 4,\"Fri\", 5,\"Sat\", 6,\"Sun\"]\n      | extend _j = 1\n    ) on _j\n  | project hour_of_day, dow_idx, dow_label;\nlet _actual = AppTraces\n  | where TimeGenerated > ago(90d)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  | extend hour_of_day = datetime_part(\"hour\", TimeGenerated)\n  | extend dow_idx = case(\n      dayofweek(TimeGenerated) == 0d, 6,\n      dayofweek(TimeGenerated) == 1d, 0,\n      dayofweek(TimeGenerated) == 2d, 1,\n      dayofweek(TimeGenerated) == 3d, 2,\n      dayofweek(TimeGenerated) == 4d, 3,\n      dayofweek(TimeGenerated) == 5d, 4,\n      5)\n  | summarize prompts = count() by hour_of_day, dow_idx;\n_grid\n| join kind=leftouter _actual on hour_of_day, dow_idx\n| extend prompts = coalesce(prompts, long(0))\n| project hour_of_day, dow_label, prompts\n| evaluate pivot(dow_label, sum(prompts))\n| project hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun\n| order by hour_of_day asc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1158,7 +1353,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| extend project = tostring(Properties['project.name'])\n| where isnotempty(project)\n| summarize\n    sessions = dcount(tostring(Properties['session.id'])),\n    prompts = countif(tostring(Properties['event.name']) == \"user_prompt\"),\n    tool_calls = countif(tostring(Properties['event.name']) == \"tool_result\"),\n    first_seen = min(TimeGenerated),\n    last_seen = max(TimeGenerated)\n  by project\n| order by sessions desc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| extend proj = tostring(Properties['project.name'])\n| where isnotempty(proj)\n| summarize\n    sessions = dcount(tostring(Properties['session.id'])),\n    prompts = countif(tostring(Properties['event.name']) == \"user_prompt\"),\n    tool_calls = countif(tostring(Properties['event.name']) == \"tool_result\"),\n    first_seen = min(TimeGenerated),\n    last_seen = max(TimeGenerated)\n  by proj\n| order by sessions desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },

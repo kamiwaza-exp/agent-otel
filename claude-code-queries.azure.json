@@ -261,7 +261,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where TimeGenerated > ago(7d)\n| extend project = tostring(Properties['project.name'])\n| where isnotempty(project)\n| summarize count_distinct = dcount(project)\n",
+            "query": "AppTraces\n| where TimeGenerated > ago(7d)\n| extend proj = tostring(Properties['project.name'])\n| where isnotempty(proj)\n| summarize count_distinct = dcount(proj)\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -493,7 +493,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where TimeGenerated > ago(30d)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend hour_of_day = datetime_part(\"hour\", TimeGenerated)\n| summarize prompts = count() by hour_of_day\n| order by hour_of_day asc\n",
+            "query": "AppTraces\n| where TimeGenerated > ago(30d)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend hour_num = datetime_part(\"hour\", TimeGenerated)\n| summarize prompts = count() by hour_num\n| extend hour_of_day = strcat(iif(hour_num < 10, \"0\", \"\"), tostring(hour_num), \":00\")\n| project hour_of_day, prompts\n| order by hour_of_day asc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -541,7 +541,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where TimeGenerated > ago(7d)\n| extend project = tostring(Properties['project.name'])\n| where isnotempty(project)\n| summarize\n    events = count(),\n    users = dcount(tostring(Properties['user.email'])),\n    sessions = dcount(tostring(Properties['session.id']))\n  by project\n| order by events desc\n",
+            "query": "AppTraces\n| where TimeGenerated > ago(7d)\n| extend proj = tostring(Properties['project.name'])\n| where isnotempty(proj)\n| summarize\n    events = count(),\n    users = dcount(tostring(Properties['user.email'])),\n    sessions = dcount(tostring(Properties['session.id']))\n  by proj\n| order by events desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -675,7 +675,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where TimeGenerated > ago(7d)\n| where Name == \"claude_code.cost.usage\"\n| extend p = parse_json(Properties)\n| extend project = tostring(p['project.name'])\n| where isnotempty(project)\n| summarize Cost = sum(Sum) by project\n| order by Cost desc\n",
+            "query": "AppMetrics\n| where TimeGenerated > ago(7d)\n| where Name == \"claude_code.cost.usage\"\n| extend p = parse_json(Properties)\n| extend proj = tostring(p['project.name'])\n| where isnotempty(proj)\n| summarize Cost = sum(Sum) by proj\n| order by Cost desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
