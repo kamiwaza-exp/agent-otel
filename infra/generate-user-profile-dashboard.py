@@ -269,14 +269,19 @@ let _actual = AppTraces
   | where TimeGenerated > ago(90d)
   {USER_FILTER_TRACES}
   | where tostring(Properties['event.name']) == "user_prompt"
-  | extend hour_of_day = datetime_part("hour", TimeGenerated)
+  // Per-user timezone shift: TimeGenerated is UTC; shift by the offset the
+  // launcher captured at session start so the heatmap reads in this user's
+  // local hours. Records without the attribute default to UTC.
+  | extend tz_off_min = coalesce(toint(tostring(Properties['host.tz_offset_minutes'])), 0)
+  | extend local_time = TimeGenerated + tz_off_min * 1m
+  | extend hour_of_day = datetime_part("hour", local_time)
   | extend dow_idx = case(
-      dayofweek(TimeGenerated) == 0d, 6,
-      dayofweek(TimeGenerated) == 1d, 0,
-      dayofweek(TimeGenerated) == 2d, 1,
-      dayofweek(TimeGenerated) == 3d, 2,
-      dayofweek(TimeGenerated) == 4d, 3,
-      dayofweek(TimeGenerated) == 5d, 4,
+      dayofweek(local_time) == 0d, 6,
+      dayofweek(local_time) == 1d, 0,
+      dayofweek(local_time) == 2d, 1,
+      dayofweek(local_time) == 3d, 2,
+      dayofweek(local_time) == 4d, 3,
+      dayofweek(local_time) == 5d, 4,
       5)
   | summarize prompts = count() by hour_of_day, dow_idx;
 _grid
@@ -680,7 +685,7 @@ dashboard = {
                 "description": "Paste the full resource ID of the Log Analytics workspace.",
                 "query": "",
                 "current": {"selected": False, "text": "", "value": ""},
-                "hide": 0,
+                "hide": 2,
                 "skipUrlSync": False,
             },
             {

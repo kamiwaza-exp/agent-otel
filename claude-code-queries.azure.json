@@ -493,7 +493,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where TimeGenerated > ago(30d)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend hour_num = datetime_part(\"hour\", TimeGenerated)\n| summarize prompts = count() by hour_num\n| extend hour_of_day = strcat(iif(hour_num < 10, \"0\", \"\"), tostring(hour_num), \":00\")\n| project hour_of_day, prompts\n| order by hour_of_day asc\n",
+            "query": "AppTraces\n| where TimeGenerated > ago(30d)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n// Per-user timezone shift before bucketing by hour. host.tz_offset_minutes\n// is set by the agent-otel launcher; records without it default to UTC.\n| extend tz_off_min = coalesce(toint(tostring(Properties['host.tz_offset_minutes'])), 0)\n| extend local_time = TimeGenerated + tz_off_min * 1m\n| extend hour_num = datetime_part(\"hour\", local_time)\n| summarize prompts = count() by hour_num\n| extend hour_of_day = strcat(iif(hour_num < 10, \"0\", \"\"), tostring(hour_num), \":00\")\n| project hour_of_day, prompts\n| order by hour_of_day asc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1008,7 +1008,7 @@
           "text": "",
           "value": ""
         },
-        "hide": 0,
+        "hide": 2,
         "skipUrlSync": false
       }
     ]

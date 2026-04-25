@@ -259,7 +259,11 @@ Q_ACTIVE_HOURS_BY_USER = """AppTraces
 Q_HOUR_OF_DAY = """AppTraces
 | where TimeGenerated > ago(30d)
 | where tostring(Properties['event.name']) == "user_prompt"
-| extend hour_num = datetime_part("hour", TimeGenerated)
+// Per-user timezone shift before bucketing by hour. host.tz_offset_minutes
+// is set by the agent-otel launcher; records without it default to UTC.
+| extend tz_off_min = coalesce(toint(tostring(Properties['host.tz_offset_minutes'])), 0)
+| extend local_time = TimeGenerated + tz_off_min * 1m
+| extend hour_num = datetime_part("hour", local_time)
 | summarize prompts = count() by hour_num
 | extend hour_of_day = strcat(iif(hour_num < 10, "0", ""), tostring(hour_num), ":00")
 | project hour_of_day, prompts
@@ -528,7 +532,7 @@ dashboard = {
                 "description": "Paste the full resource ID, e.g. /subscriptions/xxx/resourceGroups/agent-otel-rg/providers/Microsoft.OperationalInsights/workspaces/agent-otel-law",
                 "query": "",
                 "current": {"selected": False, "text": "", "value": ""},
-                "hide": 0,
+                "hide": 2,
                 "skipUrlSync": False,
             }
         ]

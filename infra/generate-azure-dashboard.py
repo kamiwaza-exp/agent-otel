@@ -540,7 +540,7 @@ def main():
             "description": "Paste the full resource ID, e.g. /subscriptions/xxx/resourceGroups/claude-obs-rg/providers/Microsoft.OperationalInsights/workspaces/claude-obs-law",
             "query": "",
             "current": {"selected": False, "text": "", "value": ""},
-            "hide": 0,
+            "hide": 2,
             "skipUrlSync": False,
         },
     )

@@ -540,7 +540,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "// Same synthetic-grid + pivot pattern as the team adoption dashboard:\n// build a full 24\u00d77 grid first so the table panel always has all seven\n// day columns, even when the user's data is sparse.\nlet _grid = range hour_of_day from 0 to 23 step 1\n  | extend _j = 1\n  | join kind=fullouter (\n      datatable(dow_idx:int, dow_label:string)\n        [0,\"Mon\", 1,\"Tue\", 2,\"Wed\", 3,\"Thu\", 4,\"Fri\", 5,\"Sat\", 6,\"Sun\"]\n      | extend _j = 1\n    ) on _j\n  | project hour_of_day, dow_idx, dow_label;\nlet _actual = AppTraces\n  | where TimeGenerated > ago(90d)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  | extend hour_of_day = datetime_part(\"hour\", TimeGenerated)\n  | extend dow_idx = case(\n      dayofweek(TimeGenerated) == 0d, 6,\n      dayofweek(TimeGenerated) == 1d, 0,\n      dayofweek(TimeGenerated) == 2d, 1,\n      dayofweek(TimeGenerated) == 3d, 2,\n      dayofweek(TimeGenerated) == 4d, 3,\n      dayofweek(TimeGenerated) == 5d, 4,\n      5)\n  | summarize prompts = count() by hour_of_day, dow_idx;\n_grid\n| join kind=leftouter _actual on hour_of_day, dow_idx\n| extend prompts = coalesce(prompts, long(0))\n| project hour_of_day, dow_label, prompts\n| evaluate pivot(dow_label, sum(prompts))\n| project hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun\n| order by hour_of_day asc\n",
+            "query": "// Same synthetic-grid + pivot pattern as the team adoption dashboard:\n// build a full 24\u00d77 grid first so the table panel always has all seven\n// day columns, even when the user's data is sparse.\nlet _grid = range hour_of_day from 0 to 23 step 1\n  | extend _j = 1\n  | join kind=fullouter (\n      datatable(dow_idx:int, dow_label:string)\n        [0,\"Mon\", 1,\"Tue\", 2,\"Wed\", 3,\"Thu\", 4,\"Fri\", 5,\"Sat\", 6,\"Sun\"]\n      | extend _j = 1\n    ) on _j\n  | project hour_of_day, dow_idx, dow_label;\nlet _actual = AppTraces\n  | where TimeGenerated > ago(90d)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  // Per-user timezone shift: TimeGenerated is UTC; shift by the offset the\n  // launcher captured at session start so the heatmap reads in this user's\n  // local hours. Records without the attribute default to UTC.\n  | extend tz_off_min = coalesce(toint(tostring(Properties['host.tz_offset_minutes'])), 0)\n  | extend local_time = TimeGenerated + tz_off_min * 1m\n  | extend hour_of_day = datetime_part(\"hour\", local_time)\n  | extend dow_idx = case(\n      dayofweek(local_time) == 0d, 6,\n      dayofweek(local_time) == 1d, 0,\n      dayofweek(local_time) == 2d, 1,\n      dayofweek(local_time) == 3d, 2,\n      dayofweek(local_time) == 4d, 3,\n      dayofweek(local_time) == 5d, 4,\n      5)\n  | summarize prompts = count() by hour_of_day, dow_idx;\n_grid\n| join kind=leftouter _actual on hour_of_day, dow_idx\n| extend prompts = coalesce(prompts, long(0))\n| project hour_of_day, dow_label, prompts\n| evaluate pivot(dow_label, sum(prompts))\n| project hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun\n| order by hour_of_day asc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1431,7 +1431,7 @@
           "text": "",
           "value": ""
         },
-        "hide": 0,
+        "hide": 2,
         "skipUrlSync": false
       },
       {

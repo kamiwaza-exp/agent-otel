@@ -488,7 +488,7 @@ dashboard = {
                 "description": "Paste the full resource ID of the Log Analytics workspace.",
                 "query": "",
                 "current": {"selected": False, "text": "", "value": ""},
-                "hide": 0,
+                "hide": 2,
                 "skipUrlSync": False,
             },
             {
