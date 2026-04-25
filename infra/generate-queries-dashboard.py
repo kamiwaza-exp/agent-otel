@@ -335,7 +335,7 @@ Q_TOKENS_BY_TYPE = """AppMetrics
 Q_TOP_TOOLS = """AppTraces
 | where TimeGenerated > ago(7d)
 | where tostring(Properties['event.name']) == "tool_result"
-| summarize calls = count() by tool = tostring(Properties['name'])
+| summarize calls = count() by tool = tostring(Properties['tool_name'])
 | order by calls desc
 """
 
@@ -345,7 +345,7 @@ Q_TOOL_SUCCESS = """AppTraces
 | summarize
     total = count(),
     successes = countif(tostring(Properties['success']) == "true")
-  by tool = tostring(Properties['name'])
+  by tool = tostring(Properties['tool_name'])
 | extend success_rate_pct = round(100.0 * successes / total, 1)
 | order by total desc
 """

@@ -175,7 +175,7 @@ KQL_BY_PANEL_ID = {
             "AppTraces\n"
             "| where $__timeFilter(TimeGenerated)\n"
             "| where tostring(Properties['event.name']) == \"tool_result\"\n"
-            "| summarize count() by tool_name = tostring(Properties['name']), bin(TimeGenerated, 5m)\n"
+            "| summarize count() by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 5m)\n"
             "| order by TimeGenerated asc"
         ),
         "resultFormat": "time_series",
@@ -185,7 +185,7 @@ KQL_BY_PANEL_ID = {
             "AppTraces\n"
             "| where $__timeFilter(TimeGenerated)\n"
             "| where tostring(Properties['event.name']) == \"tool_result\"\n"
-            "| summarize count_ = count() by tool_name = tostring(Properties['name'])\n"
+            "| summarize count_ = count() by tool_name = tostring(Properties['tool_name'])\n"
             "| order by count_ desc"
         ),
         "resultFormat": "table",
@@ -198,7 +198,7 @@ KQL_BY_PANEL_ID = {
             "| summarize\n"
             "    total = count(),\n"
             "    successes = countif(tostring(Properties['success']) == \"true\")\n"
-            "    by tool_name = tostring(Properties['name']), bin(TimeGenerated, 15m)\n"
+            "    by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 15m)\n"
             "| extend success_rate = iif(total > 0, 100.0 * successes / total, real(null))\n"
             "| project TimeGenerated, tool_name, success_rate\n"
             "| order by TimeGenerated asc"

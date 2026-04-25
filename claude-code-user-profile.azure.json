@@ -1218,7 +1218,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize calls = count() by tool = tostring(Properties['name'])\n| order by calls desc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize calls = count() by tool = tostring(Properties['tool_name'])\n| order by calls desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1263,7 +1263,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n  by tool = tostring(Properties['name'])\n| extend success_rate_pct = round(100.0 * successes / total, 1)\n| order by total desc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n  by tool = tostring(Properties['tool_name'])\n| extend success_rate_pct = round(100.0 * successes / total, 1)\n| order by total desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },

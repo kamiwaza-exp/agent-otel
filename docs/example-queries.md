@@ -341,7 +341,7 @@ costs
 AppTraces
 | where TimeGenerated > ago(7d)
 | where tostring(Properties['event.name']) == "tool_result"
-| summarize calls = count() by tool = tostring(Properties['name'])
+| summarize calls = count() by tool = tostring(Properties['tool_name'])
 | order by calls desc
 ```
 
@@ -354,7 +354,7 @@ AppTraces
 | summarize
     total = count(),
     successes = countif(tostring(Properties['success']) == "true")
-  by tool = tostring(Properties['name'])
+  by tool = tostring(Properties['tool_name'])
 | extend success_rate_pct = round(100.0 * successes / total, 1)
 | order by total desc
 ```
@@ -387,7 +387,7 @@ AppTraces
     TimeGenerated,
     email = tostring(Properties['user.email']),
     project = tostring(Properties['project.name']),
-    tool = tostring(Properties['name']),
+    tool = tostring(Properties['tool_name']),
     error = tostring(Properties['error'])
 | order by TimeGenerated desc
 | take 50
