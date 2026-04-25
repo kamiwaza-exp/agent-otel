@@ -65,7 +65,10 @@ def stat_panel(
                 "color": {"mode": "thresholds"},
                 "thresholds": {
                     "mode": "absolute",
-                    "steps": [{"color": "green", "value": None}],
+                    "steps": [
+                        {"color": "red", "value": None},
+                        {"color": "green", "value": 1},
+                    ],
                 },
                 "unit": unit,
             },
@@ -214,7 +217,7 @@ def heatmap_table_panel(
                         "id": "custom.cellOptions",
                         "value": {"type": "color-background", "mode": "gradient"},
                     },
-                    {"id": "color", "value": {"mode": "continuous-BlPu"}},
+                    {"id": "color", "value": {"mode": "continuous-RdYlGr"}},
                     {"id": "min", "value": 0},
                     {"id": "custom.align", "value": "center"},
                 ],

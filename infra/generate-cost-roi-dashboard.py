@@ -48,7 +48,10 @@ def stat_panel(pid, title, x, y, query, w=6, h=4, unit="short", description=""):
                 "color": {"mode": "thresholds"},
                 "thresholds": {
                     "mode": "absolute",
-                    "steps": [{"color": "green", "value": None}],
+                    "steps": [
+                        {"color": "red", "value": None},
+                        {"color": "green", "value": 1},
+                    ],
                 },
                 "unit": unit,
             },
