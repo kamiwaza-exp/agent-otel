@@ -1,0 +1,1306 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Single-user drilldown. Pick a user via $user. Shows their rhythm, engagement intensity, effectiveness (commits/PRs/LoC per session, prompts/day), tool usage, project breakdown, and recent prompts. Pairs with the Team Adoption dashboard (aggregate).",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "\ud83d\udc64 Identity",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false
+    },
+    {
+      "id": 301,
+      "type": "stat",
+      "title": "Sessions (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| summarize sessions = dcount(tostring(Properties['session.id']))\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 302,
+      "type": "stat",
+      "title": "Prompts (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize prompts = count()\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 303,
+      "type": "stat",
+      "title": "Active days (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize active_days = count_distinct(bin(TimeGenerated, 1d))\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 304,
+      "type": "stat",
+      "title": "Avg commits / session",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\u23f1  Personal rhythm",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "collapsed": false
+    },
+    {
+      "id": 305,
+      "type": "heatmap",
+      "title": "Hour-of-day \u00d7 day-of-week (last 90d)",
+      "description": "When this user submits prompts, last 90 days. Cell = count of user_prompt events at that hour on that weekday.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "scheme": "Spectral",
+          "fill": "dark-blue",
+          "mode": "scheme",
+          "steps": 64,
+          "reverse": true,
+          "exponent": 0.5
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false,
+          "unit": "short"
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": false
+        },
+        "legend": {
+          "show": true
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-09
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where TimeGenerated > ago(90d)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend hour_of_day = datetime_part(\"hour\", TimeGenerated)\n| extend dow_idx = case(\n    dayofweek(TimeGenerated) == 0d, 6,\n    dayofweek(TimeGenerated) == 1d, 0,\n    dayofweek(TimeGenerated) == 2d, 1,\n    dayofweek(TimeGenerated) == 3d, 2,\n    dayofweek(TimeGenerated) == 4d, 3,\n    dayofweek(TimeGenerated) == 5d, 4,\n    5)\n| extend dow = case(\n    dow_idx == 0, \"Mon\", dow_idx == 1, \"Tue\", dow_idx == 2, \"Wed\",\n    dow_idx == 3, \"Thu\", dow_idx == 4, \"Fri\", dow_idx == 5, \"Sat\", \"Sun\")\n| summarize prompts = count() by dow, hour_of_day, dow_idx\n| order by dow_idx asc, hour_of_day asc\n| project dow, hour_of_day, prompts\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udcc8 Engagement intensity",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "collapsed": false
+    },
+    {
+      "id": 306,
+      "type": "timeseries",
+      "title": "Prompts per day",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize prompts = count() by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "prompts"
+        }
+      ]
+    },
+    {
+      "id": 307,
+      "type": "timeseries",
+      "title": "Sessions per day",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| summarize sessions = dcount(tostring(Properties['session.id'])) by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "sessions"
+        }
+      ]
+    },
+    {
+      "id": 308,
+      "type": "timeseries",
+      "title": "Avg prompts per session over time",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(Properties['session.id'])\n| summarize prompts = count(), sessions = dcount(session) by day\n| extend prompts_per_session = round(todouble(prompts) / sessions, 2)\n| project TimeGenerated = day, prompts_per_session\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "prompts/session"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83c\udfaf Effectiveness",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "collapsed": false
+    },
+    {
+      "id": 309,
+      "type": "stat",
+      "title": "Avg commits / session (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 310,
+      "type": "stat",
+      "title": "Avg PRs / session (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 34,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 311,
+      "type": "stat",
+      "title": "Avg net LoC / session (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 34,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| extend t = tostring(_p['type'])\n| summarize\n    added   = sumif(Sum, t == \"added\"),\n    removed = sumif(Sum, t == \"removed\"),\n    sessions = dcount(tostring(_p['session.id']))\n| extend net = added - removed\n| extend avg_net_per_session = iif(sessions > 0, round(todouble(net) / sessions, 1), 0.0)\n| project avg_net_per_session\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 312,
+      "type": "timeseries",
+      "title": "Commits per session over time",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "commits/session"
+        }
+      ]
+    },
+    {
+      "id": 313,
+      "type": "timeseries",
+      "title": "PRs per session over time",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "PRs/session"
+        }
+      ]
+    },
+    {
+      "id": 314,
+      "type": "timeseries",
+      "title": "LoC per session over time (added vs removed)",
+      "description": "Two series: lines added per session, lines removed per session. Daily binned.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| where tostring(_p['type']) == \"added\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "added"
+        },
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| where tostring(_p['type']) == \"removed\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "B",
+          "legendFormat": "removed"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udd27 Tool usage",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "collapsed": false
+    },
+    {
+      "id": 315,
+      "type": "table",
+      "title": "Top tools (window)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize calls = count() by tool = tostring(Properties['name'])\n| order by calls desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 316,
+      "type": "table",
+      "title": "Tool success rate by tool",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 55,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n  by tool = tostring(Properties['name'])\n| extend success_rate_pct = round(100.0 * successes / total, 1)\n| order by total desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 317,
+      "type": "timeseries",
+      "title": "Tools per prompt over time",
+      "description": "Daily ratio of tool_result events to user_prompt events. Higher = each ask is doing more work.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "let prompts = AppTraces\n  | where $__timeFilter(TimeGenerated)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  | summarize prompts = count() by bin(TimeGenerated, 1d);\nlet tools = AppTraces\n  | where $__timeFilter(TimeGenerated)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"tool_result\"\n  | summarize tools = count() by bin(TimeGenerated, 1d);\nprompts\n| join kind=leftouter tools on TimeGenerated\n| extend tools_per_prompt = round(todouble(coalesce(tools, 0)) / prompts, 2)\n| project TimeGenerated, tools_per_prompt\n| order by TimeGenerated asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "time_series"
+          },
+          "refId": "A",
+          "legendFormat": "tools/prompt"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\uddc2  Where time goes",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "collapsed": false
+    },
+    {
+      "id": 318,
+      "type": "table",
+      "title": "Per-project breakdown (window)",
+      "description": "Sessions, prompts, and tool calls by project.name. Requires the agent-otel launcher to be installed for project attribution.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 73,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| extend project = tostring(Properties['project.name'])\n| where isnotempty(project)\n| summarize\n    sessions = dcount(tostring(Properties['session.id'])),\n    prompts = countif(tostring(Properties['event.name']) == \"user_prompt\"),\n    tool_calls = countif(tostring(Properties['event.name']) == \"tool_result\"),\n    first_seen = min(TimeGenerated),\n    last_seen = max(TimeGenerated)\n  by project\n| order by sessions desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udcdd Recent activity",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "collapsed": false
+    },
+    {
+      "id": 319,
+      "type": "logs",
+      "title": "Recent prompts (last 50, window)",
+      "description": "Last 50 user_prompt events for this user. Shows project context, prompt length, and prompt text (server-side redacted for known secret patterns).",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 84,
+        "w": 24,
+        "h": 12
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", coalesce(tostring(Properties['project.name']), \"(no project)\"), \"] \",\n        \"len=\", tostring(Properties['prompt_length']), \" \",\n        iif(isnotempty(tostring(Properties['prompt'])),\n            tostring(Properties['prompt']),\n            \"<prompt text not logged>\"))\n| order by TimeGenerated desc\n| take 50\n",
+            "resource": "$law_resource",
+            "resultFormat": "logs"
+          },
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": [
+    "claude-code",
+    "observability",
+    "user-profile"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "law_resource",
+        "type": "textbox",
+        "label": "Log Analytics Workspace Resource ID",
+        "description": "Paste the full resource ID of the Log Analytics workspace.",
+        "query": "",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "user",
+        "type": "query",
+        "label": "User",
+        "description": "Single-select. Defaults to the most recently active user.",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "${DS_AZURE_MONITOR}"
+        },
+        "query": {
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where TimeGenerated > ago(90d)\n| extend email = tostring(Properties['user.email'])\n| where isnotempty(email)\n| summarize last_seen = max(TimeGenerated) by email\n| order by last_seen desc\n| project email",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "user"
+        },
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Agent Observability \u2014 User Profile",
+  "uid": "agent-otel-user-profile",
+  "version": 1,
+  "__inputs": [
+    {
+      "name": "DS_AZURE_MONITOR",
+      "label": "Azure Monitor",
+      "description": "Azure Monitor data source with access to the Log Analytics workspace.",
+      "type": "datasource",
+      "pluginId": "grafana-azure-monitor-datasource",
+      "pluginName": "Azure Monitor"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-azure-monitor-datasource",
+      "name": "Azure Monitor",
+      "version": "1.0.0"
+    }
+  ]
+}
