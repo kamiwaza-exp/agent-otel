@@ -72,6 +72,17 @@ processors:
     send_batch_max_size: 1500
     timeout: 10s
 
+  # Claude Code (and most OTel SDKs) emit counter-style metrics with Delta
+  # aggregation temporality. Prometheus remote-write requires Cumulative —
+  # without this conversion, PRW logs "invalid temporality and type
+  # combination for metric X" and drops every counter. This processor keeps
+  # a running sum per series so downstream consumers see proper Cumulative
+  # counters.
+  deltatocumulative:
+    # How long a series can go idle before state is dropped. 5m matches the
+    # Claude Code 60s export cadence with plenty of margin.
+    max_stale: 5m
+
   # In-flight secret redaction for log records. Acts on attribute values that
   # carry free-form text (prompt, error). Runs BEFORE export so cleartext never
   # leaves the collector.
@@ -265,11 +276,10 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resource, batch]
-      # debug exporter temporarily added to confirm whether metrics arrive
-      # at the collector at all. If v9 logs show no Metric records, the
-      # client (Claude Code) isn't shipping metrics — likely needs
-      # OTEL_METRICS_EXPORTER=otlp set on the client side.
+      # deltatocumulative must run BEFORE batch so the running-sum state is
+      # correct per series across batches. Otherwise a batch boundary can
+      # hide/duplicate samples.
+      processors: [memory_limiter, resource, deltatocumulative, batch]
       exporters: [prometheusremotewrite, debug]
     logs:
       receivers: [otlp]
