@@ -27,10 +27,10 @@
       "title": "\ud83d\udcca Overview",
       "type": "row",
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 24,
+        "h": 1
       },
       "collapsed": false
     },
@@ -67,10 +67,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 0,
-        "y": 1
+        "y": 1,
+        "w": 6,
+        "h": 4
       },
       "id": 1,
       "options": {
@@ -135,10 +135,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 6,
-        "y": 1
+        "y": 1,
+        "w": 6,
+        "h": 4
       },
       "id": 2,
       "options": {
@@ -203,10 +203,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 12,
-        "y": 1
+        "y": 1,
+        "w": 6,
+        "h": 4
       },
       "id": 3,
       "options": {
@@ -271,10 +271,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 18,
-        "y": 1
+        "y": 1,
+        "w": 6,
+        "h": 4
       },
       "id": 4,
       "options": {
@@ -310,10 +310,10 @@
       "title": "\ud83d\udcb0 Cost & Usage Analysis",
       "type": "row",
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 5
+        "y": 5,
+        "w": 24,
+        "h": 1
       },
       "collapsed": false
     },
@@ -374,10 +374,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 6
+        "y": 6,
+        "w": 12,
+        "h": 8
       },
       "id": 5,
       "options": {
@@ -544,10 +544,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 6
+        "y": 6,
+        "w": 12,
+        "h": 8
       },
       "id": 6,
       "options": {
@@ -675,10 +675,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
         "x": 0,
-        "y": 14
+        "y": 14,
+        "w": 12,
+        "h": 8
       },
       "id": 15,
       "options": {
@@ -715,10 +715,10 @@
       "title": "\ud83d\udd27 Tool Usage & Performance",
       "type": "row",
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 22
+        "y": 22,
+        "w": 24,
+        "h": 1
       },
       "collapsed": false
     },
@@ -849,10 +849,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 23
+        "y": 23,
+        "w": 12,
+        "h": 8
       },
       "id": 7,
       "options": {
@@ -1008,10 +1008,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 23
+        "y": 23,
+        "w": 12,
+        "h": 8
       },
       "id": 14,
       "options": {
@@ -1117,10 +1117,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "x": 0,
+        "y": 31,
         "w": 12,
-        "x": 12,
-        "y": 23
+        "h": 8
       },
       "id": 8,
       "options": {
@@ -1159,10 +1159,10 @@
       "title": "\u26a1 Performance & Errors",
       "type": "row",
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 39
+        "y": 39,
+        "w": 24,
+        "h": 1
       },
       "collapsed": false
     },
@@ -1223,10 +1223,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 40
+        "y": 40,
+        "w": 12,
+        "h": 8
       },
       "id": 9,
       "options": {
@@ -1319,10 +1319,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 40
+        "y": 40,
+        "w": 12,
+        "h": 8
       },
       "id": 10,
       "options": {
@@ -1361,10 +1361,10 @@
       "title": "\ud83d\udcdd User Activity & Productivity",
       "type": "row",
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 48
+        "y": 48,
+        "w": 24,
+        "h": 1
       },
       "collapsed": false
     },
@@ -1425,10 +1425,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 49
+        "y": 49,
+        "w": 12,
+        "h": 8
       },
       "id": 11,
       "options": {
@@ -1516,10 +1516,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 49
+        "y": 49,
+        "w": 12,
+        "h": 8
       },
       "id": 12,
       "options": {
@@ -1564,10 +1564,10 @@
       "title": "\ud83d\udd0d Event Logs",
       "type": "row",
       "gridPos": {
-        "h": 1,
-        "w": 24,
         "x": 0,
-        "y": 57
+        "y": 57,
+        "w": 24,
+        "h": 1
       },
       "collapsed": false
     },
@@ -1577,10 +1577,10 @@
         "uid": "${DS_AZURE_MONITOR}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 58
+        "y": 66,
+        "w": 24,
+        "h": 8
       },
       "id": 13,
       "options": {
@@ -1601,7 +1601,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"tool_result\"\n| project\n    TimeGenerated,\n    Tool = tostring(Properties['name']),\n    Status = iif(tostring(Properties['success']) == \"true\", \"\u2705\", \"\u274c\"),\n    DurationMs = toint(Properties['duration_ms']),\n    Error = tostring(Properties['error'])\n| order by TimeGenerated desc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"tool_result\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", tostring(Properties['name']), \"] \",\n        iif(tostring(Properties['success']) == \"true\", \"\u2705\", \"\u274c\"), \" \",\n        tostring(Properties['duration_ms']), \"ms\",\n        iif(isnotempty(tostring(Properties['error'])),\n            strcat(\" ERROR: \", tostring(Properties['error'])),\n            \"\"))\n| order by TimeGenerated desc",
             "resource": "$law_resource",
             "resultFormat": "logs"
           },
@@ -1617,10 +1617,10 @@
         "uid": "${DS_AZURE_MONITOR}"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 58
+        "x": 0,
+        "y": 74,
+        "w": 24,
+        "h": 8
       },
       "id": 17,
       "options": {
@@ -1641,7 +1641,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_error\"\n| project\n    TimeGenerated,\n    Model = tostring(Properties['model']),\n    StatusCode = tostring(Properties['status_code']),\n    DurationMs = toint(Properties['duration_ms']),\n    Error = tostring(Properties['error']),\n    Attempt = toint(Properties['attempt'])\n| order by TimeGenerated desc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_error\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", tostring(Properties['model']), \"] HTTP \",\n        tostring(Properties['status_code']), \" \",\n        tostring(Properties['duration_ms']), \"ms\",\n        \" (attempt \", tostring(Properties['attempt']), \") \",\n        \"ERROR: \", tostring(Properties['error']))\n| order by TimeGenerated desc",
             "resource": "$law_resource",
             "resultFormat": "logs"
           },
@@ -1650,6 +1650,46 @@
       ],
       "title": "API Error Events",
       "type": "logs"
+    },
+    {
+      "id": 20,
+      "type": "logs",
+      "title": "User Prompts",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 24,
+        "h": 8
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", substring(tostring(Properties['session.id']), 0, 8), \"] \",\n        \"len=\", tostring(Properties['prompt_length']), \" \",\n        iif(isnotempty(tostring(Properties['prompt'])),\n            tostring(Properties['prompt']),\n            \"<prompt text not logged: set OTEL_LOG_USER_PROMPTS=1 on the client>\"))\n| order by TimeGenerated desc",
+            "resource": "$law_resource",
+            "resultFormat": "logs"
+          },
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",

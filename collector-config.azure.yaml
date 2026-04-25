@@ -219,6 +219,19 @@ exporters:
     endpoint: ${env:AZURE_MONITOR_METRICS_ENDPOINT}
     auth:
       authenticator: azureauth
+    # Default timeout 5s → 30s wasn't enough; bumping to 60s. From outside
+    # Azure the DCE responds in ~0.7s, but from inside Container Apps every
+    # request hangs the full timeout window. Suspected azureauth IMDS path
+    # warm-up; once a token is cached subsequent requests should be fast.
+    timeout: 60s
+    # Retry transient errors. Note: prometheusremotewrite wraps timeouts as
+    # "Permanent" errors, which skip the retry path — so this mainly helps
+    # 5xx and connection-reset cases. Worth having anyway.
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 5m
     # Include resource attributes as labels on every metric. Without this,
     # deployment.environment / service.name don't reach Prometheus labels.
     resource_to_telemetry_conversion:
@@ -253,7 +266,11 @@ service:
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [prometheusremotewrite]
+      # debug exporter temporarily added to confirm whether metrics arrive
+      # at the collector at all. If v9 logs show no Metric records, the
+      # client (Claude Code) isn't shipping metrics — likely needs
+      # OTEL_METRICS_EXPORTER=otlp set on the client side.
+      exporters: [prometheusremotewrite, debug]
     logs:
       receivers: [otlp]
       # Order: memory_limiter (admission control) → resource (decorate) →

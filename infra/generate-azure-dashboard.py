@@ -94,37 +94,161 @@ KQL_BY_PANEL_ID = {
         "resultFormat": "time_series",
     },
     13: {
+        # Synthesize a single Message column: Grafana's "logs" result format
+        # only renders the timestamp + a Message body. Multiple project columns
+        # collapse to just the timestamp, which is why the panel showed dates
+        # only. strcat-ing a one-line summary recovers the LogQL look.
         "query": (
             "AppTraces\n"
             "| where $__timeFilter(TimeGenerated)\n"
             "| where tostring(Properties['event.name']) == \"tool_result\"\n"
             "| project\n"
             "    TimeGenerated,\n"
-            "    Tool = tostring(Properties['name']),\n"
-            '    Status = iif(tostring(Properties[\'success\']) == "true", "✅", "❌"),\n'
-            "    DurationMs = toint(Properties['duration_ms']),\n"
-            "    Error = tostring(Properties['error'])\n"
+            "    Message = strcat(\n"
+            '        "[", tostring(Properties[\'name\']), "] ",\n'
+            '        iif(tostring(Properties[\'success\']) == "true", "✅", "❌"), " ",\n'
+            "        tostring(Properties['duration_ms']), \"ms\",\n"
+            "        iif(isnotempty(tostring(Properties['error'])),\n"
+            "            strcat(\" ERROR: \", tostring(Properties['error'])),\n"
+            '            ""))\n'
             "| order by TimeGenerated desc"
         ),
         "resultFormat": "logs",
     },
     17: {
+        # Same Message-column synthesis as panel 13. api_error always carries
+        # an error attribute, so no isnotempty guard needed.
         "query": (
             "AppTraces\n"
             "| where $__timeFilter(TimeGenerated)\n"
             "| where tostring(Properties['event.name']) == \"api_error\"\n"
             "| project\n"
             "    TimeGenerated,\n"
-            "    Model = tostring(Properties['model']),\n"
-            "    StatusCode = tostring(Properties['status_code']),\n"
-            "    DurationMs = toint(Properties['duration_ms']),\n"
-            "    Error = tostring(Properties['error']),\n"
-            "    Attempt = toint(Properties['attempt'])\n"
+            "    Message = strcat(\n"
+            '        "[", tostring(Properties[\'model\']), "] HTTP ",\n'
+            "        tostring(Properties['status_code']), \" \",\n"
+            "        tostring(Properties['duration_ms']), \"ms\",\n"
+            '        " (attempt ", tostring(Properties[\'attempt\']), ") ",\n'
+            "        \"ERROR: \", tostring(Properties['error']))\n"
             "| order by TimeGenerated desc"
         ),
         "resultFormat": "logs",
     },
 }
+
+
+# Azure-port layout overrides. Sized per:
+#   - log/text panels: full width (w=24)
+#   - chart panels (timeseries, barchart): half width (w=12)
+#   - stat panels (numbers/dials): quarter width (w=6)
+# y values keep the original section grouping but compact within each section.
+PANEL_GRID = {
+    # Overview — stat panels, quarter width
+    1: {"x": 0, "y": 1, "w": 6, "h": 4},
+    2: {"x": 6, "y": 1, "w": 6, "h": 4},
+    3: {"x": 12, "y": 1, "w": 6, "h": 4},
+    4: {"x": 18, "y": 1, "w": 6, "h": 4},
+    # Cost & Usage — charts, half width
+    5: {"x": 0, "y": 6, "w": 12, "h": 8},
+    6: {"x": 12, "y": 6, "w": 12, "h": 8},
+    15: {"x": 0, "y": 14, "w": 12, "h": 8},  # was full width in local
+    # Tool Usage & Performance — charts; id=8 moved off the y=23 collision
+    7: {"x": 0, "y": 23, "w": 12, "h": 8},
+    14: {"x": 12, "y": 23, "w": 12, "h": 8},
+    8: {"x": 0, "y": 31, "w": 12, "h": 8},
+    # Performance & Errors — charts
+    9: {"x": 0, "y": 40, "w": 12, "h": 8},
+    10: {"x": 12, "y": 40, "w": 12, "h": 8},
+    # User Activity & Productivity — charts
+    11: {"x": 0, "y": 49, "w": 12, "h": 8},
+    12: {"x": 12, "y": 49, "w": 12, "h": 8},
+    # Event Logs — log panels, full width, stacked vertically
+    20: {"x": 0, "y": 58, "w": 24, "h": 8},  # User Prompts (Azure-only)
+    13: {"x": 0, "y": 66, "w": 24, "h": 8},  # Tool Execution Events
+    17: {"x": 0, "y": 74, "w": 24, "h": 8},  # API Error Events
+}
+
+# Row positions follow the panel y-positions above. Rows are matched by title
+# (no stable id) so any title rename in the local dashboard breaks the match —
+# update both sides together.
+ROW_GRID = {
+    "📊 Overview": {"x": 0, "y": 0, "w": 24, "h": 1},
+    "💰 Cost & Usage Analysis": {"x": 0, "y": 5, "w": 24, "h": 1},
+    "🔧 Tool Usage & Performance": {"x": 0, "y": 22, "w": 24, "h": 1},
+    "⚡ Performance & Errors": {"x": 0, "y": 39, "w": 24, "h": 1},
+    "📝 User Activity & Productivity": {"x": 0, "y": 48, "w": 24, "h": 1},
+    "🔍 Event Logs": {"x": 0, "y": 57, "w": 24, "h": 1},
+}
+
+
+def apply_layout(panels: list[dict]) -> None:
+    """Override gridPos per Azure layout rules. Mutates panels in place."""
+    for p in panels:
+        if p.get("type") == "row":
+            title = p.get("title")
+            if isinstance(title, str):
+                grid = ROW_GRID.get(title)
+                if grid:
+                    p["gridPos"] = grid
+        else:
+            pid = p.get("id")
+            if isinstance(pid, int):
+                grid = PANEL_GRID.get(pid)
+                if grid:
+                    p["gridPos"] = grid
+
+
+def make_user_prompts_panel() -> dict:
+    """Construct the User Prompts log panel (Azure-only — no local equivalent).
+
+    Renders one row per user_prompt event using a synthesized Message column,
+    same shape as the other log panels. If `Properties['prompt']` is empty
+    (Claude Code defaults to NOT logging prompt text — set
+    OTEL_LOG_USER_PROMPTS=1 to opt in), the panel shows a hint instead so
+    the empty state is self-explanatory.
+    """
+    return {
+        "id": 20,
+        "type": "logs",
+        "title": "User Prompts",
+        "datasource": AZURE_DS,
+        "gridPos": {"x": 0, "y": 58, "w": 24, "h": 8},
+        "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": True,
+            "prettifyLogMessage": False,
+            "showCommonLabels": False,
+            "showLabels": False,
+            "showTime": True,
+            "sortOrder": "Descending",
+            "wrapLogMessage": True,
+        },
+        "targets": [
+            {
+                "datasource": AZURE_DS,
+                "queryType": "Azure Log Analytics",
+                "azureLogAnalytics": {
+                    "query": (
+                        "AppTraces\n"
+                        "| where $__timeFilter(TimeGenerated)\n"
+                        "| where tostring(Properties['event.name']) == \"user_prompt\"\n"
+                        "| project\n"
+                        "    TimeGenerated,\n"
+                        "    Message = strcat(\n"
+                        '        "[", substring(tostring(Properties[\'session.id\']), 0, 8), "] ",\n'
+                        '        "len=", tostring(Properties[\'prompt_length\']), " ",\n'
+                        "        iif(isnotempty(tostring(Properties['prompt'])),\n"
+                        "            tostring(Properties['prompt']),\n"
+                        '            "<prompt text not logged: set OTEL_LOG_USER_PROMPTS=1 on the client>"))\n'
+                        "| order by TimeGenerated desc"
+                    ),
+                    "resource": LA_RESOURCE_VAR,
+                    "resultFormat": "logs",
+                },
+                "refId": "A",
+            }
+        ],
+    }
 
 
 def make_azure_target(panel_id: int, ref_id: str = "A", legend: str = "") -> dict:
@@ -279,8 +403,11 @@ def main():
     )
     templating["list"] = tvars
 
-    # Rewrite panels.
+    # Rewrite panels, append the Azure-only User Prompts panel, then apply
+    # Azure-specific layout overrides so widths/positions match the new rules.
     dst["panels"] = [rewrite_panel(p) for p in src.get("panels", [])]
+    dst["panels"].append(make_user_prompts_panel())
+    apply_layout(dst["panels"])
 
     DST.write_text(json.dumps(dst, indent=2) + "\n")
     print(f"Wrote {DST} ({DST.stat().st_size} bytes, {len(dst['panels'])} panels)")
