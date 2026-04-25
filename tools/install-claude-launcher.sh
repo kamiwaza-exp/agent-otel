@@ -1,31 +1,39 @@
 #!/usr/bin/env bash
 # install-claude-launcher.sh
 #
-# Installs a thin wrapper at ~/.local/bin/claude that augments
-# OTEL_RESOURCE_ATTRIBUTES with host.name + project.name/path/repo
+# Installs a thin wrapper at $KZ_ENG_MP_ROOT/agent-otel/bin/claude that
+# augments OTEL_RESOURCE_ATTRIBUTES with host.name + project.name/path/repo
 # before exec'ing the real Claude Code binary. The wrapper has to run
 # *before* claude starts because the OTel SDK reads resource attributes
 # at initialization — a SessionStart hook is too late.
 #
+# Install location follows the kamiwaza-engineering-marketplace tree so
+# team tooling is co-located:
+#   $KZ_ENG_MP_ROOT/agent-otel/bin/claude       (the wrapper)
+# Falls back to ~/.kz-eng-mp/agent-otel/bin/claude if the env var isn't set.
+#
 # What this installer does:
 #   1. Locate the current `claude` binary via PATH (must not already be
 #      our wrapper).
-#   2. Create ~/.local/bin if it doesn't exist.
-#   3. Generate ~/.local/bin/claude with the absolute path to the real
-#      binary baked in (so PATH ordering doesn't matter and we can't
-#      recurse into ourselves).
-#   4. Add ~/.local/bin to PATH at the front of the user's bash or zsh
-#      rc, idempotently (marker-line guarded).
+#   2. Create the install dir if it doesn't exist.
+#   3. Generate the wrapper with the absolute path to the real binary
+#      baked in (so PATH ordering doesn't matter and we can't recurse
+#      into ourselves).
+#   4. Add the install dir to PATH at the front of the user's bash or
+#      zsh rc, idempotently (marker-line guarded).
 #
 # Re-run any time to refresh — the wrapper will be regenerated with the
 # currently-resolved real binary.
 #
-# Uninstall: delete ~/.local/bin/claude and remove the marked block from
+# Uninstall: delete the wrapper file and remove the marked block from
 # ~/.zshrc or ~/.bashrc.
 
 set -euo pipefail
 
-INSTALL_DIR="${HOME}/.local/bin"
+# Allow the marketplace to override the root location via the standard
+# env var; default matches the existing kz-eng-mp convention.
+KZ_ENG_MP_ROOT="${KZ_ENG_MP_ROOT:-$HOME/.kz-eng-mp}"
+INSTALL_DIR="${KZ_ENG_MP_ROOT}/agent-otel/bin"
 WRAPPER_PATH="${INSTALL_DIR}/claude"
 MARKER="# agent-otel: claude launcher"
 

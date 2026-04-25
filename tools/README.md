@@ -4,10 +4,16 @@ Helper scripts for the agent-otel deployment.
 
 ## `install-claude-launcher.sh`
 
-Installs `~/.local/bin/claude` — a thin wrapper that injects host and project
-context into `OTEL_RESOURCE_ATTRIBUTES` before exec'ing the real Claude Code
-binary. The OTel SDK reads resource attributes at process startup, before any
-SessionStart hook fires, so the wrapper has to set them *before* `claude` runs.
+Installs `$KZ_ENG_MP_ROOT/agent-otel/bin/claude` (default
+`~/.kz-eng-mp/agent-otel/bin/claude`) — a thin wrapper that injects host and
+project context into `OTEL_RESOURCE_ATTRIBUTES` before exec'ing the real
+Claude Code binary. The OTel SDK reads resource attributes at process
+startup, before any SessionStart hook fires, so the wrapper has to set them
+*before* `claude` runs.
+
+The install location follows the kamiwaza-engineering-marketplace tree so
+team tooling is co-located. Override with `KZ_ENG_MP_ROOT=/some/path` if you
+keep the marketplace elsewhere.
 
 Attributes added to every metric and event:
 
@@ -29,14 +35,15 @@ Existing attributes set by Claude Code itself (`user.email`, `session.id`,
 
 What it does:
 1. Resolves the current `claude` in PATH (must not already be the wrapper).
-2. Writes `~/.local/bin/claude` with the real binary path baked in.
+2. Writes `$KZ_ENG_MP_ROOT/agent-otel/bin/claude` with the real binary path baked in.
 3. Adds `~/.local/bin` to PATH at the front of `~/.zshrc` or `~/.bashrc`,
    guarded by a marker comment so re-running is idempotent.
 
 After install, open a fresh shell (or `exec $SHELL`) and verify:
 
 ```bash
-which claude        # → ~/.local/bin/claude
+which claude        # → $KZ_ENG_MP_ROOT/agent-otel/bin/claude
+                    #   (≈ ~/.kz-eng-mp/agent-otel/bin/claude)
 claude --version    # same version as before
 ```
 
@@ -64,10 +71,10 @@ Code update relocates the binary). The PATH hook is preserved.
 ### Uninstall
 
 ```bash
-rm ~/.local/bin/claude
+rm "$KZ_ENG_MP_ROOT/agent-otel/bin/claude"
 # Then remove the marker block from ~/.zshrc or ~/.bashrc:
 #   # agent-otel: claude launcher
-#   case ":${PATH}:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH";; esac
+#   case ":${PATH}:" in *":<install-dir>:"*) ;; *) export PATH="<install-dir>:$PATH";; esac
 ```
 
 ### Limitations
