@@ -1,0 +1,276 @@
+# OpenTelemetry Collector config — Azure deployment
+#
+# Counterpart to collector-config.yaml (local/Loki). This config is mounted into
+# the Azure Container App version of the collector.
+#
+# Data flow:
+#   OTLP in (4317/4318)
+#     ├─ metrics → prometheusremotewrite → Azure Monitor Workspace DCE (Managed Prometheus, Entra-auth via Managed Identity)
+#     └─ logs    → azuremonitor          → Application Insights (workspace-based, lands in LA workspace)
+#
+# Auth:
+#   - Metrics: User-assigned Managed Identity → Monitoring Metrics Publisher on the metrics DCR
+#   - Logs:    Application Insights connection string (embeds an instrumentation key)
+#
+# Expected environment variables (set by the Container App):
+#   AZURE_CLIENT_ID                          — client ID of the attached user-assigned MI (used by azureauth extension)
+#   AZURE_MONITOR_METRICS_ENDPOINT           — full PRW URL: https://<dce>/dataCollectionRules/<dcr>/streams/Microsoft-PrometheusMetrics/api/v1/write
+#   APPLICATIONINSIGHTS_CONNECTION_STRING    — full AI connection string, e.g. "InstrumentationKey=...;IngestionEndpoint=https://...applicationinsights.azure.com/;..."
+
+extensions:
+  # Managed Identity auth for Azure endpoints, via the azureauthextension.
+  # Available in otel-collector-contrib >= 0.124.0; we pin to 0.140.0 in the
+  # Container App template (older 0.116.x is dynamically linked and broken on
+  # `FROM scratch` images; older still don't have this extension).
+  #
+  # The extension uses IMDS on the Container App to fetch short-lived bearer
+  # tokens for the user-assigned MI, refreshing automatically. No secrets in
+  # config.
+  #
+  # The registered config key is `azureauth` (underscore) — the README and
+  # codebase agree; the no-underscore form silently fails to match.
+  azureauth:
+    managed_identity:
+      # Identity client ID is injected by the Container App at runtime
+      # (AZURE_CLIENT_ID is set automatically when a user-assigned MI is attached).
+      client_id: ${env:AZURE_CLIENT_ID}
+
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Guard against OOM kills in a small (0.25 vCPU / 0.5 GiB) Container App replica.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  # Tag every telemetry item with deployment metadata. deployment.environment
+  # is a standard OTel semantic-conventions attribute and becomes a Prometheus
+  # label / Log Analytics column via the DCR transform.
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "azure-production"
+        action: upsert
+      - key: deployment.platform
+        value: "azure-container-apps"
+        action: upsert
+
+  # Batching reduces API calls to the DCE. Size/timeout tuned for Claude Code's
+  # typical emission cadence (bursty on session start, sparse otherwise).
+  batch:
+    send_batch_size: 1000
+    send_batch_max_size: 1500
+    timeout: 10s
+
+  # In-flight secret redaction for log records. Acts on attribute values that
+  # carry free-form text (prompt, error). Runs BEFORE export so cleartext never
+  # leaves the collector.
+  #
+  # Each pattern is a separate OTTL statement; statements run in declaration
+  # order. error_mode: ignore prevents a single regex error or unexpected nil
+  # from killing the pipeline.
+  #
+  # Pattern strategy: only redact tokens with structured prefixes/shapes —
+  # high-confidence, low false-positive. Generic high-entropy strings (32+
+  # hex chars, opaque blobs) are NOT redacted because they look identical to
+  # request IDs, file hashes, and other non-secrets.
+  transform/redact_secrets:
+    # Production setting. Many Claude Code log records have neither a `prompt`
+    # nor an `error` attribute (only user_prompt events have prompt; only
+    # api_error events have error). Under `propagate`, an OTTL evaluation
+    # error against a missing attribute can fail the whole batch and drop
+    # every record — flip back to `propagate` only briefly to debug pattern
+    # compile failures, never leave it on.
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Anthropic API keys (must run first — sk-ant-* would otherwise be
+          # partially matched by the OpenAI sk- pattern, though the hyphen
+          # would break it; defensive ordering).
+          - 'replace_pattern(attributes["prompt"], "sk-ant-[a-zA-Z0-9_-]{20,}", "[REDACTED:anthropic-key]")'
+          - 'replace_pattern(attributes["error"], "sk-ant-[a-zA-Z0-9_-]{20,}", "[REDACTED:anthropic-key]")'
+
+          # OpenAI API keys (48-char alnum after sk-)
+          - 'replace_pattern(attributes["prompt"], "sk-[a-zA-Z0-9]{48}", "[REDACTED:openai-key]")'
+          - 'replace_pattern(attributes["error"], "sk-[a-zA-Z0-9]{48}", "[REDACTED:openai-key]")'
+
+          # AWS access key IDs
+          - 'replace_pattern(attributes["prompt"], "AKIA[A-Z0-9]{16}", "[REDACTED:aws-access-key]")'
+          - 'replace_pattern(attributes["error"], "AKIA[A-Z0-9]{16}", "[REDACTED:aws-access-key]")'
+
+          # GitHub personal access tokens (ghp_, gho_, ghu_, ghs_)
+          - 'replace_pattern(attributes["prompt"], "gh[opsu]_[A-Za-z0-9_]{36,}", "[REDACTED:github-token]")'
+          - 'replace_pattern(attributes["error"], "gh[opsu]_[A-Za-z0-9_]{36,}", "[REDACTED:github-token]")'
+
+          # Slack tokens (xoxb-, xoxp-, xoxa-, xoxr-, xoxs-)
+          - 'replace_pattern(attributes["prompt"], "xox[baprs]-[A-Za-z0-9-]+", "[REDACTED:slack-token]")'
+          - 'replace_pattern(attributes["error"], "xox[baprs]-[A-Za-z0-9-]+", "[REDACTED:slack-token]")'
+
+          # JWT tokens (3 base64url segments separated by .)
+          - 'replace_pattern(attributes["prompt"], "eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+", "[REDACTED:jwt]")'
+          - 'replace_pattern(attributes["error"], "eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+", "[REDACTED:jwt]")'
+
+          # Bearer-style auth tokens (the literal "Bearer <token>" pattern)
+          - 'replace_pattern(attributes["prompt"], "(?i)bearer\\s+[A-Za-z0-9._\\-+/=]{20,}", "Bearer [REDACTED:bearer-token]")'
+          - 'replace_pattern(attributes["error"], "(?i)bearer\\s+[A-Za-z0-9._\\-+/=]{20,}", "Bearer [REDACTED:bearer-token]")'
+
+          # PEM-encoded private keys (RSA, EC, ED25519, generic). Multi-line.
+          - 'replace_pattern(attributes["prompt"], "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END[\\s\\S]+?-----", "[REDACTED:private-key]")'
+          - 'replace_pattern(attributes["error"], "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]+?-----END[\\s\\S]+?-----", "[REDACTED:private-key]")'
+
+          # Database connection strings with embedded credentials.
+          # Match shape: scheme://user:password@... — replace the user:pass@ part.
+          - 'replace_pattern(attributes["prompt"], "(postgres|postgresql|mysql|mongodb|redis)://[^:]+:[^@]+@", "$$1://[REDACTED:db-credentials]@")'
+          - 'replace_pattern(attributes["error"], "(postgres|postgresql|mysql|mongodb|redis)://[^:]+:[^@]+@", "$$1://[REDACTED:db-credentials]@")'
+
+          # ----- Vendor-prefix patterns -----
+          # Each pattern is a unique prefix tied to one service. Distinct enough
+          # to not false-positive on normal text. Add new vendors here as you
+          # spot them in prompts.
+
+          # Linear (api + oauth tokens)
+          - 'replace_pattern(attributes["prompt"], "lin_(api|oauth)_[A-Za-z0-9]{40,}", "[REDACTED:linear]")'
+          - 'replace_pattern(attributes["error"], "lin_(api|oauth)_[A-Za-z0-9]{40,}", "[REDACTED:linear]")'
+
+          # Tavily
+          - 'replace_pattern(attributes["prompt"], "tvly-[A-Za-z0-9_-]{20,}", "[REDACTED:tavily]")'
+          - 'replace_pattern(attributes["error"], "tvly-[A-Za-z0-9_-]{20,}", "[REDACTED:tavily]")'
+
+          # Google API keys (Gemini, AI Studio, GCP) — fixed-shape AIza prefix + 35 chars
+          - 'replace_pattern(attributes["prompt"], "AIza[0-9A-Za-z_-]{35}", "[REDACTED:google-api]")'
+          - 'replace_pattern(attributes["error"], "AIza[0-9A-Za-z_-]{35}", "[REDACTED:google-api]")'
+
+          # Perplexity
+          - 'replace_pattern(attributes["prompt"], "pplx-[A-Za-z0-9]{20,}", "[REDACTED:perplexity]")'
+          - 'replace_pattern(attributes["error"], "pplx-[A-Za-z0-9]{20,}", "[REDACTED:perplexity]")'
+
+          # xAI / Grok
+          - 'replace_pattern(attributes["prompt"], "xai-[A-Za-z0-9_-]{20,}", "[REDACTED:xai]")'
+          - 'replace_pattern(attributes["error"], "xai-[A-Za-z0-9_-]{20,}", "[REDACTED:xai]")'
+
+          # Groq
+          - 'replace_pattern(attributes["prompt"], "gsk_[A-Za-z0-9]{40,}", "[REDACTED:groq]")'
+          - 'replace_pattern(attributes["error"], "gsk_[A-Za-z0-9]{40,}", "[REDACTED:groq]")'
+
+          # Hugging Face
+          - 'replace_pattern(attributes["prompt"], "hf_[A-Za-z0-9]{30,}", "[REDACTED:huggingface]")'
+          - 'replace_pattern(attributes["error"], "hf_[A-Za-z0-9]{30,}", "[REDACTED:huggingface]")'
+
+          # Replicate
+          - 'replace_pattern(attributes["prompt"], "r8_[A-Za-z0-9]{30,}", "[REDACTED:replicate]")'
+          - 'replace_pattern(attributes["error"], "r8_[A-Za-z0-9]{30,}", "[REDACTED:replicate]")'
+
+          # Firecrawl (32-char hex after fc-)
+          - 'replace_pattern(attributes["prompt"], "fc-[a-f0-9]{32}", "[REDACTED:firecrawl]")'
+          - 'replace_pattern(attributes["error"], "fc-[a-f0-9]{32}", "[REDACTED:firecrawl]")'
+
+          # GitLab personal access token
+          - 'replace_pattern(attributes["prompt"], "glpat-[A-Za-z0-9_-]{20}", "[REDACTED:gitlab]")'
+          - 'replace_pattern(attributes["error"], "glpat-[A-Za-z0-9_-]{20}", "[REDACTED:gitlab]")'
+
+          # Stripe (sk/pk/rk × live/test)
+          - 'replace_pattern(attributes["prompt"], "(sk|pk|rk)_(live|test)_[A-Za-z0-9]{20,}", "[REDACTED:stripe]")'
+          - 'replace_pattern(attributes["error"], "(sk|pk|rk)_(live|test)_[A-Za-z0-9]{20,}", "[REDACTED:stripe]")'
+
+          # npm
+          - 'replace_pattern(attributes["prompt"], "npm_[A-Za-z0-9]{36}", "[REDACTED:npm-token]")'
+          - 'replace_pattern(attributes["error"], "npm_[A-Za-z0-9]{36}", "[REDACTED:npm-token]")'
+
+          # Docker Hub PAT
+          - 'replace_pattern(attributes["prompt"], "dckr_pat_[A-Za-z0-9_-]{32,}", "[REDACTED:docker-hub]")'
+          - 'replace_pattern(attributes["error"], "dckr_pat_[A-Za-z0-9_-]{32,}", "[REDACTED:docker-hub]")'
+
+          # Figma
+          - 'replace_pattern(attributes["prompt"], "figd_[A-Za-z0-9_-]{20,}", "[REDACTED:figma]")'
+          - 'replace_pattern(attributes["error"], "figd_[A-Za-z0-9_-]{20,}", "[REDACTED:figma]")'
+
+          # SendGrid (SG.<22>.<43>)
+          - 'replace_pattern(attributes["prompt"], "SG\\.[A-Za-z0-9_-]{22}\\.[A-Za-z0-9_-]{43}", "[REDACTED:sendgrid]")'
+          - 'replace_pattern(attributes["error"], "SG\\.[A-Za-z0-9_-]{22}\\.[A-Za-z0-9_-]{43}", "[REDACTED:sendgrid]")'
+
+          # Notion (legacy secret_ + new ntn_)
+          - 'replace_pattern(attributes["prompt"], "(secret|ntn)_[A-Za-z0-9]{43,44}", "[REDACTED:notion]")'
+          - 'replace_pattern(attributes["error"], "(secret|ntn)_[A-Za-z0-9]{43,44}", "[REDACTED:notion]")'
+
+          # ----- Contextual catch-all -----
+          # Last-resort safety net: any "<keyword>: <16+ chars>" or "<keyword>=<16+ chars>"
+          # pattern where keyword is a known secret-related word. Runs AFTER all
+          # vendor-prefix patterns so specific labels win on overlapping matches.
+          # Captures the keyword in $$1 to keep the redacted line readable.
+          - 'replace_pattern(attributes["prompt"], "(?i)\\b(api[_-]?key|apikey|access[_-]?key|secret[_-]?key|secret[_-]?token|auth[_-]?token|access[_-]?token|client[_-]?secret|signing[_-]?key|password|passwd|credential)\\s*[:=]\\s*[A-Za-z0-9+/_.\\-=]{16,}", "$$1=[REDACTED:contextual-secret]")'
+          - 'replace_pattern(attributes["error"], "(?i)\\b(api[_-]?key|apikey|access[_-]?key|secret[_-]?key|secret[_-]?token|auth[_-]?token|access[_-]?token|client[_-]?secret|signing[_-]?key|password|passwd|credential)\\s*[:=]\\s*[A-Za-z0-9+/_.\\-=]{16,}", "$$1=[REDACTED:contextual-secret]")'
+
+exporters:
+  # Managed Prometheus via remote write.
+  # Azure Monitor Workspace DCE accepts Prometheus remote-write protocol on a
+  # URL that embeds the DCR ID and the Microsoft-PrometheusMetrics stream.
+  prometheusremotewrite:
+    endpoint: ${env:AZURE_MONITOR_METRICS_ENDPOINT}
+    auth:
+      authenticator: azureauth
+    # Include resource attributes as labels on every metric. Without this,
+    # deployment.environment / service.name don't reach Prometheus labels.
+    resource_to_telemetry_conversion:
+      enabled: true
+    remote_write_queue:
+      enabled: true
+      queue_size: 10000
+      num_consumers: 5
+    # Defensive: drop any metric with > 1000 labels to avoid cardinality blowups
+    # from a misconfigured client.
+    max_batch_size_bytes: 3000000
+
+  # Application Insights (workspace-based). Data lands in the LA workspace
+  # under the auto-provisioned App* tables (AppTraces / AppEvents).
+  # The connection string includes the instrumentation key used for auth and
+  # the regional ingestion endpoint URL — no separate endpoint config needed.
+  azuremonitor:
+    connection_string: ${env:APPLICATIONINSIGHTS_CONNECTION_STRING}
+    maxbatchsize: 100
+    maxbatchinterval: 10s
+    # Note: this exporter does not apply its own sampling. The AI resource
+    # is configured with SamplingPercentage=100 (no ingestion-side drops).
+
+  # Debug exporter — temporarily wired into logs pipeline to verify what's
+  # making it through redaction. Set verbosity: detailed for full payload.
+  debug:
+    verbosity: detailed
+
+service:
+  extensions: [azureauth, health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      # Order: memory_limiter (admission control) → resource (decorate) →
+      # transform/redact_secrets (scrub free-form text) → batch (efficiency)
+      # Redaction must happen before batch so individual records are scrubbed
+      # before any cross-record grouping; before export so cleartext never leaves.
+      processors: [memory_limiter, resource, transform/redact_secrets, batch]
+      # debug exporter is temporary — confirms what's reaching exporters and
+      # helps diagnose missing AppTraces data. Remove once verified.
+      exporters: [azuremonitor, debug]
+  telemetry:
+    # Collector self-telemetry. Useful when debugging why data isn't flowing.
+    logs:
+      level: info
+    metrics:
+      level: basic
+      # Newer collector versions replaced `address: host:port` with the
+      # `readers:` shape. We don't strictly need self-metrics exposed
+      # externally — leaving readers unset means in-process only, which
+      # is fine for v1.
