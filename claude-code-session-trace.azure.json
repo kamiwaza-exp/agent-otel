@@ -1,0 +1,818 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Per-session replay view. Pick a session via $session_id, then click any prompt row to load its trace into the waterfall panel below. Span search lets you find tool calls or model invocations across the whole session by free-text match.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "\ud83d\udccb Session metadata",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "User \u2022 Project",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 3
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend email = tostring(Properties['user.email']), proj = tostring(Properties['project.name'])\n| summarize email=any(email), proj=any(proj)\n| extend display = iff(isempty(proj), email, strcat(email, ' \u2022 ', proj))\n| project display\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Duration",
+      "description": "Wall-clock minutes between first and last event in the dashboard window.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| summarize started = min(TimeGenerated), ended = max(TimeGenerated)\n| extend duration_min = round(todouble(datetime_diff('second', ended, started)) / 60.0, 1)\n| project duration_min\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total cost (USD)",
+      "description": "Sum of cost_usd from api_request events. Excludes cached input.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 3
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| where tostring(Properties['event.name']) == 'api_request'\n| extend cost = todouble(Properties['cost_usd'])\n| summarize total_cost = sum(cost)\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total tokens (in+out)",
+      "description": "",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 3
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| where tostring(Properties['event.name']) == 'api_request'\n| extend in_tok = toint(Properties['input_tokens']),\n         out_tok = toint(Properties['output_tokens'])\n| summarize total_tokens = sum(in_tok) + sum(out_tok)\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udcac Prompts in this session \u2014 click any OperationId cell to switch traces",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "collapsed": false
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Prompts (interaction spans)",
+      "description": "One row per claude_code.interaction span. Click a row's OperationId cell to populate $operation_id and load that prompt's trace below.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OperationId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Load this prompt's trace \u2193",
+                    "url": "/d/agent-otel-session-trace?${__url_time_range}&var-session_id=${session_id}&var-operation_id=${__data.fields.OperationId}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 400
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "#"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 50
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "chars"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status_code"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OperationId"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Name == 'claude_code.interaction'\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend full_prompt = tostring(Properties['user_prompt']),\n         prompt_len = toint(Properties['user_prompt_length']),\n         seq = toint(Properties['interaction.sequence']),\n         status_code = tostring(Properties['otel.status_code'])\n| extend preview = iff(strlen(full_prompt) > 140,\n                       strcat(substring(full_prompt, 0, 140), '\u2026'),\n                       full_prompt)\n| project ['#'] = seq,\n          started = TimeGenerated,\n          duration_ms = DurationMs,\n          chars = prompt_len,\n          status_code,\n          OperationId,\n          prompt = preview\n| order by started asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83c\udf33 Trace for selected prompt",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "collapsed": false
+    },
+    {
+      "id": 6,
+      "type": "traces",
+      "title": "Trace waterfall",
+      "description": "Click a row in the prompts table above to populate $operation_id. Then this panel renders the full span tree (claude_code.interaction \u2192 llm_request \u2192 tool \u2192 tool.execution) as a collapsible waterfall.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 22
+      },
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Traces",
+          "azureTraces": {
+            "resources": [
+              "${ai_resource}"
+            ],
+            "operationId": "${operation_id}",
+            "resultFormat": "trace"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udd0e Span search across the whole session",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "collapsed": false
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Spans (filtered by $search)",
+      "description": "All spans for the selected session. Type in $search above to filter by span name or any attribute value (case-sensitive substring). Up to 500 rows.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 24,
+        "h": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "duration_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "full_command"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 400
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend props_text = tostring(Properties)\n| where '${search}' == '' or Name contains_cs '${search}' or props_text contains_cs '${search}'\n| extend tool = tostring(Properties['tool_name']),\n         model = tostring(Properties['gen_ai.request.model']),\n         status_code = tostring(Properties['otel.status_code']),\n         full_command = tostring(Properties['full_command'])\n| project started = TimeGenerated, span = Name, tool, model, full_command,\n          duration_ms = DurationMs, status_code, OperationId, Id, ParentId\n| order by started asc\n| take 500\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udcca Tool usage & errors",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 55
+      },
+      "collapsed": false
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Tool usage breakdown",
+      "description": "Aggregated over claude_code.tool.execution spans for this session.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Name == 'claude_code.tool.execution'\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend tool = tostring(Properties['tool_name'])\n| where isnotempty(tool)\n| summarize calls = count(),\n            total_ms = sum(DurationMs),\n            avg_ms = round(avg(DurationMs), 0),\n            p95_ms = round(percentile(DurationMs, 95), 0)\n            by tool\n| order by total_ms desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Errors & rejected tools",
+      "description": "Span-level errors (otel.status_code=ERROR) and tool decisions where the user rejected the tool call.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "union\n  (AppDependencies\n   | where $__timeFilter(TimeGenerated)\n   | where tostring(Properties['session.id']) == '${session_id}'\n   | where tostring(Properties['otel.status_code']) == 'ERROR'\n   | extend entry_kind = 'span_error', detail = Name),\n  (AppTraces\n   | where $__timeFilter(TimeGenerated)\n   | where tostring(Properties['session.id']) == '${session_id}'\n   | where tostring(Properties['event.name']) == 'tool_decision'\n       and tostring(Properties['decision_type']) == 'reject'\n   | extend entry_kind = 'tool_rejected', detail = tostring(Properties['tool_name']))\n| project started = TimeGenerated, entry_kind, detail\n| order by started asc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": [
+    "claude-code",
+    "observability",
+    "session-trace"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "law_resource",
+        "type": "textbox",
+        "label": "Log Analytics Workspace Resource ID",
+        "description": "Paste the full resource ID of the Log Analytics workspace.",
+        "query": "",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 2,
+        "skipUrlSync": false
+      },
+      {
+        "name": "ai_resource",
+        "type": "textbox",
+        "label": "Application Insights Resource ID",
+        "description": "Paste the full resource ID of the Application Insights component (used by the Azure Traces query).",
+        "query": "",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 2,
+        "skipUrlSync": false
+      },
+      {
+        "name": "session_id",
+        "type": "query",
+        "label": "Session",
+        "description": "Recent sessions (last 7 days) ordered by start time. Label format: <email> \u00b7 <date> \u00b7 <prompt_count>p. Only sessions that have at least one claude_code.interaction span (i.e., emitted with beta tracing on) appear here.",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "${DS_AZURE_MONITOR}"
+        },
+        "query": {
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppDependencies\n| where TimeGenerated > ago(7d)\n| where Name == 'claude_code.interaction'\n| extend email = tostring(Properties['user.email']),\n         sess = tostring(Properties['session.id'])\n| where isnotempty(sess)\n| summarize first_seen = min(TimeGenerated), prompts = count() by sess, email\n| order by first_seen desc\n| take 100\n| project __value = sess,\n          __text = strcat(email, ' \u00b7 ',\n                          format_datetime(first_seen, 'yy-MM-dd HH:mm'),\n                          ' \u00b7 ', prompts, 'p')",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "session_id"
+        },
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "operation_id",
+        "type": "query",
+        "label": "Operation ID",
+        "description": "Auto-populated from interactions in the selected session, newest first. Default selection is the most recent prompt's trace; click any other prompt row to switch.",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "${DS_AZURE_MONITOR}"
+        },
+        "query": {
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppDependencies\n| where TimeGenerated > ago(7d)\n| where Name == 'claude_code.interaction'\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend seq = toint(Properties['interaction.sequence']),\n         preview = substring(tostring(Properties['user_prompt']), 0, 60)\n| order by TimeGenerated desc\n| take 50\n| project __value = OperationId,\n          __text = strcat('#', seq, ' \u00b7 ', preview)",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "operation_id"
+        },
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "label": "Span search",
+        "description": "Case-sensitive substring match across span name and all properties. Empty = show all spans.",
+        "query": "",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Agent Observability \u2014 Session Trace",
+  "uid": "agent-otel-session-trace",
+  "version": 1,
+  "__inputs": [
+    {
+      "name": "DS_AZURE_MONITOR",
+      "label": "Azure Monitor",
+      "description": "Azure Monitor data source with access to Log Analytics + Application Insights.",
+      "type": "datasource",
+      "pluginId": "grafana-azure-monitor-datasource",
+      "pluginName": "Azure Monitor"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-azure-monitor-datasource",
+      "name": "Azure Monitor",
+      "version": "1.0.0"
+    }
+  ]
+}

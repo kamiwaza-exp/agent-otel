@@ -17,6 +17,7 @@
 #   GRAFANA_NAME    Azure Managed Grafana resource name (default: agent-otel-grafana)
 #   RESOURCE_GROUP  RG that contains both Grafana and the LA workspace (default: agent-otel-rg)
 #   LA_WORKSPACE    LA workspace name to bake into law_resource (default: agent-otel-law)
+#   AI_COMPONENT    App Insights component name to bake into ai_resource (default: agent-otel-ai)
 #   FOLDER_UID      Grafana folder uid to upload into (default: empty = root)
 #   OVERWRITE       "true" (default) | "false"
 set -euo pipefail
@@ -24,6 +25,7 @@ set -euo pipefail
 GRAFANA_NAME="${GRAFANA_NAME:-agent-otel-grafana}"
 RESOURCE_GROUP="${RESOURCE_GROUP:-agent-otel-rg}"
 LA_WORKSPACE="${LA_WORKSPACE:-agent-otel-law}"
+AI_COMPONENT="${AI_COMPONENT:-agent-otel-ai}"
 FOLDER_UID="${FOLDER_UID:-}"
 OVERWRITE="${OVERWRITE:-true}"
 
@@ -55,10 +57,16 @@ LA_RESOURCE_ID=$(az monitor log-analytics workspace show \
   -g "$RESOURCE_GROUP" -n "$LA_WORKSPACE" --query id -o tsv 2>/dev/null || true)
 [[ -n $LA_RESOURCE_ID ]] || err "LA workspace '$LA_WORKSPACE' not found in '$RESOURCE_GROUP'."
 
+info "Resolving App Insights resource ID for '$AI_COMPONENT'..."
+AI_RESOURCE_ID=$(az monitor app-insights component show \
+  -g "$RESOURCE_GROUP" -a "$AI_COMPONENT" --query id -o tsv 2>/dev/null || true)
+[[ -n $AI_RESOURCE_ID ]] || err "App Insights component '$AI_COMPONENT' not found in '$RESOURCE_GROUP'."
+
 info ""
 info "Grafana:        $GRAFANA_NAME (rg=$RESOURCE_GROUP)"
 info "Datasource UID: $DS_UID"
 info "LA resource:    $LA_RESOURCE_ID"
+info "AI resource:    $AI_RESOURCE_ID"
 [[ -n $FOLDER_UID ]] && info "Folder UID:     $FOLDER_UID"
 info ""
 
@@ -89,6 +97,7 @@ upload_one() {
   jq \
     --arg ds "$DS_UID" \
     --arg la "$LA_RESOURCE_ID" \
+    --arg ai "$AI_RESOURCE_ID" \
     '
       del(.__inputs, .__requires)
       | .id = null
@@ -102,6 +111,11 @@ upload_one() {
           then . + {
                  query: $la,
                  current: { selected: false, text: $la, value: $la }
+               }
+          elif .name == "ai_resource"
+          then . + {
+                 query: $ai,
+                 current: { selected: false, text: $ai, value: $ai }
                }
           else .
           end)

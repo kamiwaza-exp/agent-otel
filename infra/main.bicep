@@ -269,6 +269,23 @@ resource raGrafanaLawReader 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
+// Grafana needs read access on the App Insights component itself for
+// the "Azure Traces" query type used by the session-trace dashboard.
+// IMPORTANT: Monitoring Reader is NOT sufficient — its */read wildcard
+// does not cover the data-plane action microsoft.insights/transactions/read
+// (verified empirically). Use Application Insights Component Contributor,
+// which explicitly lists transactions/read in its actions array.
+var role_AppInsightsComponentContributor = 'ae349356-3a1b-4a5e-921d-050484c6347e'
+resource raGrafanaAiContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(appInsights.id, grafana.id, role_AppInsightsComponentContributor)
+  scope: appInsights
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', role_AppInsightsComponentContributor)
+    principalId: grafana.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Grant each listed admin principal the Grafana Admin role (data-plane).
 resource raGrafanaAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (principalId, i) in grafanaAdminPrincipalIds: {
   name: guid(grafana.id, principalId, 'grafana-admin')
