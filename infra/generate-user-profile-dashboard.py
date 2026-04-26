@@ -217,11 +217,15 @@ def row(title, y):
 
 
 # ── shared filter clauses ─────────────────────────────────────────────
-# $user is single-select; quoted with literal-quote so it goes into KQL as a string.
-USER_FILTER_TRACES = "| where tostring(Properties['user.email']) == '${user}'"
+# $users is multi-select. With `Include All = true` and no Custom all
+# value, "All" expands to every distinct user.email from the variable's
+# source query, so `in (...)` always sees a concrete list.
+USER_FILTER_TRACES = (
+    "| where tostring(Properties['user.email']) in (${users:doublequote})"
+)
 USER_FILTER_METRICS = (
     "| extend _p = parse_json(Properties)\n"
-    "| where tostring(_p['user.email']) == '${user}'"
+    "| where tostring(_p['user.email']) in (${users:doublequote})"
 )
 
 
@@ -337,7 +341,7 @@ def _per_session_query(metric_name: str, type_filter: str = "") -> str:
 | where $__timeFilter(TimeGenerated)
 | where Name == "{metric_name}"
 | extend _p = parse_json(Properties)
-| where tostring(_p['user.email']) == '${{user}}'{extra_filter}
+| where tostring(_p['user.email']) in (${{users:doublequote}}){extra_filter}
 | extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])
 | summarize value = sum(Sum), sessions = dcount(session) by day
 | extend per_session = round(todouble(value) / sessions, 3)
@@ -663,10 +667,13 @@ panels.append(
 dashboard = {
     "annotations": {"list": []},
     "description": (
-        "Single-user drilldown. Pick a user via $user. Shows their rhythm, "
-        "engagement intensity, effectiveness (commits/PRs/LoC per session, "
-        "prompts/day), tool usage, project breakdown, and recent prompts. "
-        "Pairs with the Team Adoption dashboard (aggregate)."
+        "User profile drilldown. Pick one or more users via $users. "
+        "Shows per-user rhythm, engagement intensity, effectiveness "
+        "(commits/PRs/LoC per session, prompts/day), tool usage, "
+        "project breakdown, and recent prompts. Aggregates across "
+        "the selected users; pick a single user for a focused view "
+        "or several to compare. Pairs with the Team Adoption "
+        "dashboard (team-wide aggregate)."
     ),
     "editable": True,
     "fiscalYearStartMonth": 0,
@@ -692,10 +699,10 @@ dashboard = {
                 "skipUrlSync": False,
             },
             {
-                "name": "user",
+                "name": "users",
                 "type": "query",
-                "label": "User",
-                "description": "Single-select. Defaults to the most recently active user.",
+                "label": "Users",
+                "description": "Multi-select. 'All' expands to every distinct user.email seen in the dashboard window. Pick one for a single-user profile, or several to compare.",
                 "datasource": AZURE_DS,
                 "query": {
                     "queryType": "Azure Log Analytics",
@@ -712,12 +719,13 @@ dashboard = {
                         "resource": LA_RESOURCE_VAR,
                         "resultFormat": "table",
                     },
-                    "refId": "user",
+                    "refId": "users",
                 },
                 "refresh": 2,
-                "multi": False,
-                "includeAll": False,
-                "current": {"selected": False, "text": "", "value": ""},
+                "multi": True,
+                "includeAll": True,
+                "allValue": None,
+                "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
                 "hide": 0,
                 "skipUrlSync": False,
             },

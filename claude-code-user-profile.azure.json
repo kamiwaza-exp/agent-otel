@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Single-user drilldown. Pick a user via $user. Shows their rhythm, engagement intensity, effectiveness (commits/PRs/LoC per session, prompts/day), tool usage, project breakdown, and recent prompts. Pairs with the Team Adoption dashboard (aggregate).",
+  "description": "User profile drilldown. Pick one or more users via $users. Shows per-user rhythm, engagement intensity, effectiveness (commits/PRs/LoC per session, prompts/day), tool usage, project breakdown, and recent prompts. Aggregates across the selected users; pick a single user for a focused view or several to compare. Pairs with the Team Adoption dashboard (team-wide aggregate).",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -79,7 +79,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| summarize sessions = dcount(tostring(Properties['session.id']))\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| summarize sessions = dcount(tostring(Properties['session.id']))\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -145,7 +145,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize prompts = count()\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize prompts = count()\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -211,7 +211,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize active_days = count_distinct(bin(TimeGenerated, 1d))\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize active_days = count_distinct(bin(TimeGenerated, 1d))\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -277,7 +277,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -556,7 +556,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "// Same synthetic-grid + pivot pattern as the team adoption dashboard:\n// build a full 24\u00d77 grid first so the table panel always has all seven\n// day columns, even when the user's data is sparse.\nlet _grid = range hour_of_day from 0 to 23 step 1\n  | extend _j = 1\n  | join kind=fullouter (\n      datatable(dow_idx:int, dow_label:string)\n        [0,\"Mon\", 1,\"Tue\", 2,\"Wed\", 3,\"Thu\", 4,\"Fri\", 5,\"Sat\", 6,\"Sun\"]\n      | extend _j = 1\n    ) on _j\n  | project hour_of_day, dow_idx, dow_label;\nlet _actual = AppTraces\n  | where TimeGenerated > ago(90d)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  // Per-user timezone shift: TimeGenerated is UTC; shift by the offset the\n  // launcher captured at session start so the heatmap reads in this user's\n  // local hours. Records without the attribute default to UTC.\n  | extend tz_off_min = coalesce(toint(tostring(Properties['host.tz_offset_minutes'])), 0)\n  | extend local_time = TimeGenerated + tz_off_min * 1m\n  | extend hour_of_day = datetime_part(\"hour\", local_time)\n  | extend dow_idx = case(\n      dayofweek(local_time) == 0d, 6,\n      dayofweek(local_time) == 1d, 0,\n      dayofweek(local_time) == 2d, 1,\n      dayofweek(local_time) == 3d, 2,\n      dayofweek(local_time) == 4d, 3,\n      dayofweek(local_time) == 5d, 4,\n      5)\n  | summarize prompts = count() by hour_of_day, dow_idx;\n_grid\n| join kind=leftouter _actual on hour_of_day, dow_idx\n| extend prompts = coalesce(prompts, long(0))\n| project hour_of_day, dow_label, prompts\n| evaluate pivot(dow_label, sum(prompts))\n| project hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun\n| order by hour_of_day asc\n",
+            "query": "// Same synthetic-grid + pivot pattern as the team adoption dashboard:\n// build a full 24\u00d77 grid first so the table panel always has all seven\n// day columns, even when the user's data is sparse.\nlet _grid = range hour_of_day from 0 to 23 step 1\n  | extend _j = 1\n  | join kind=fullouter (\n      datatable(dow_idx:int, dow_label:string)\n        [0,\"Mon\", 1,\"Tue\", 2,\"Wed\", 3,\"Thu\", 4,\"Fri\", 5,\"Sat\", 6,\"Sun\"]\n      | extend _j = 1\n    ) on _j\n  | project hour_of_day, dow_idx, dow_label;\nlet _actual = AppTraces\n  | where TimeGenerated > ago(90d)\n  | where tostring(Properties['user.email']) in (${users:doublequote})\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  // Per-user timezone shift: TimeGenerated is UTC; shift by the offset the\n  // launcher captured at session start so the heatmap reads in this user's\n  // local hours. Records without the attribute default to UTC.\n  | extend tz_off_min = coalesce(toint(tostring(Properties['host.tz_offset_minutes'])), 0)\n  | extend local_time = TimeGenerated + tz_off_min * 1m\n  | extend hour_of_day = datetime_part(\"hour\", local_time)\n  | extend dow_idx = case(\n      dayofweek(local_time) == 0d, 6,\n      dayofweek(local_time) == 1d, 0,\n      dayofweek(local_time) == 2d, 1,\n      dayofweek(local_time) == 3d, 2,\n      dayofweek(local_time) == 4d, 3,\n      dayofweek(local_time) == 5d, 4,\n      5)\n  | summarize prompts = count() by hour_of_day, dow_idx;\n_grid\n| join kind=leftouter _actual on hour_of_day, dow_idx\n| extend prompts = coalesce(prompts, long(0))\n| project hour_of_day, dow_label, prompts\n| evaluate pivot(dow_label, sum(prompts))\n| project hour_of_day, Mon, Tue, Wed, Thu, Fri, Sat, Sun\n| order by hour_of_day asc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -628,7 +628,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize prompts = count() by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| summarize prompts = count() by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -690,7 +690,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| summarize sessions = dcount(tostring(Properties['session.id'])) by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| summarize sessions = dcount(tostring(Properties['session.id'])) by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -752,7 +752,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(Properties['session.id'])\n| summarize prompts = count(), sessions = dcount(session) by day\n| extend prompts_per_session = round(todouble(prompts) / sessions, 2)\n| project TimeGenerated = day, prompts_per_session\n| order by TimeGenerated asc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(Properties['session.id'])\n| summarize prompts = count(), sessions = dcount(session) by day\n| extend prompts_per_session = round(todouble(prompts) / sessions, 2)\n| project TimeGenerated = day, prompts_per_session\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -830,7 +830,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -896,7 +896,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize total = sum(Sum), sessions = dcount(tostring(_p['session.id']))\n| extend avg = iif(sessions > 0, round(todouble(total) / sessions, 2), 0.0)\n| project avg\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -962,7 +962,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| extend t = tostring(_p['type'])\n| summarize\n    added   = sumif(Sum, t == \"added\"),\n    removed = sumif(Sum, t == \"removed\"),\n    sessions = dcount(tostring(_p['session.id']))\n| extend net = added - removed\n| extend avg_net_per_session = iif(sessions > 0, round(todouble(net) / sessions, 1), 0.0)\n| project avg_net_per_session\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| extend t = tostring(_p['type'])\n| summarize\n    added   = sumif(Sum, t == \"added\"),\n    removed = sumif(Sum, t == \"removed\"),\n    sessions = dcount(tostring(_p['session.id']))\n| extend net = added - removed\n| extend avg_net_per_session = iif(sessions > 0, round(todouble(net) / sessions, 1), 0.0)\n| project avg_net_per_session\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1023,7 +1023,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1085,7 +1085,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1147,7 +1147,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| where tostring(_p['type']) == \"added\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| where tostring(_p['type']) == \"added\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1161,7 +1161,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) == '${user}'\n| where tostring(_p['type']) == \"removed\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| where tostring(_p['type']) == \"removed\"\n| extend day = bin(TimeGenerated, 1d), session = tostring(_p['session.id'])\n| summarize value = sum(Sum), sessions = dcount(session) by day\n| extend per_session = round(todouble(value) / sessions, 3)\n| project TimeGenerated = day, per_session\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1218,7 +1218,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize calls = count() by tool = tostring(Properties['tool_name'])\n| order by calls desc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize calls = count() by tool = tostring(Properties['tool_name'])\n| order by calls desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1263,7 +1263,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n  by tool = tostring(Properties['tool_name'])\n| extend success_rate_pct = round(100.0 * successes / total, 1)\n| order by total desc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n  by tool = tostring(Properties['tool_name'])\n| extend success_rate_pct = round(100.0 * successes / total, 1)\n| order by total desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1324,7 +1324,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "let prompts = AppTraces\n  | where $__timeFilter(TimeGenerated)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  | summarize prompts = count() by bin(TimeGenerated, 1d);\nlet tools = AppTraces\n  | where $__timeFilter(TimeGenerated)\n  | where tostring(Properties['user.email']) == '${user}'\n  | where tostring(Properties['event.name']) == \"tool_result\"\n  | summarize tools = count() by bin(TimeGenerated, 1d);\nprompts\n| join kind=leftouter tools on TimeGenerated\n| extend tools_per_prompt = round(todouble(coalesce(tools, 0)) / prompts, 2)\n| project TimeGenerated, tools_per_prompt\n| order by TimeGenerated asc\n",
+            "query": "let prompts = AppTraces\n  | where $__timeFilter(TimeGenerated)\n  | where tostring(Properties['user.email']) in (${users:doublequote})\n  | where tostring(Properties['event.name']) == \"user_prompt\"\n  | summarize prompts = count() by bin(TimeGenerated, 1d);\nlet tools = AppTraces\n  | where $__timeFilter(TimeGenerated)\n  | where tostring(Properties['user.email']) in (${users:doublequote})\n  | where tostring(Properties['event.name']) == \"tool_result\"\n  | summarize tools = count() by bin(TimeGenerated, 1d);\nprompts\n| join kind=leftouter tools on TimeGenerated\n| extend tools_per_prompt = round(todouble(coalesce(tools, 0)) / prompts, 2)\n| project TimeGenerated, tools_per_prompt\n| order by TimeGenerated asc\n",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1381,7 +1381,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| extend proj = tostring(Properties['project.name'])\n| where isnotempty(proj)\n| summarize\n    sessions = dcount(tostring(Properties['session.id'])),\n    prompts = countif(tostring(Properties['event.name']) == \"user_prompt\"),\n    tool_calls = countif(tostring(Properties['event.name']) == \"tool_result\"),\n    first_seen = min(TimeGenerated),\n    last_seen = max(TimeGenerated)\n  by proj\n| order by sessions desc\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| extend proj = tostring(Properties['project.name'])\n| where isnotempty(proj)\n| summarize\n    sessions = dcount(tostring(Properties['session.id'])),\n    prompts = countif(tostring(Properties['event.name']) == \"user_prompt\"),\n    tool_calls = countif(tostring(Properties['event.name']) == \"tool_result\"),\n    first_seen = min(TimeGenerated),\n    last_seen = max(TimeGenerated)\n  by proj\n| order by sessions desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1429,7 +1429,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) == '${user}'\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", coalesce(tostring(Properties['project.name']), \"(no project)\"), \"] \",\n        \"len=\", tostring(Properties['prompt_length']), \" \",\n        iif(isnotempty(tostring(Properties['prompt'])),\n            tostring(Properties['prompt']),\n            \"<prompt text not logged>\"))\n| order by TimeGenerated desc\n| take 50\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", coalesce(tostring(Properties['project.name']), \"(no project)\"), \"] \",\n        \"len=\", tostring(Properties['prompt_length']), \" \",\n        iif(isnotempty(tostring(Properties['prompt'])),\n            tostring(Properties['prompt']),\n            \"<prompt text not logged>\"))\n| order by TimeGenerated desc\n| take 50\n",
             "resource": "$law_resource",
             "resultFormat": "logs"
           },
@@ -1463,10 +1463,10 @@
         "skipUrlSync": false
       },
       {
-        "name": "user",
+        "name": "users",
         "type": "query",
-        "label": "User",
-        "description": "Single-select. Defaults to the most recently active user.",
+        "label": "Users",
+        "description": "Multi-select. 'All' expands to every distinct user.email seen in the dashboard window. Pick one for a single-user profile, or several to compare.",
         "datasource": {
           "type": "grafana-azure-monitor-datasource",
           "uid": "${DS_AZURE_MONITOR}"
@@ -1478,15 +1478,20 @@
             "resource": "$law_resource",
             "resultFormat": "table"
           },
-          "refId": "user"
+          "refId": "users"
         },
         "refresh": 2,
-        "multi": false,
-        "includeAll": false,
+        "multi": true,
+        "includeAll": true,
+        "allValue": null,
         "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "hide": 0,
         "skipUrlSync": false
