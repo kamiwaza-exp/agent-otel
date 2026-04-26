@@ -580,13 +580,18 @@ def main():
                 "queryType": "Azure Log Analytics",
                 "azureLogAnalytics": {
                     "query": (
-                        """AppTraces
-| where $__timeFilter(TimeGenerated)
-| where tostring(Properties['user.email']) in (${users:doublequote})
-| extend email = tostring(Properties['user.email'])
-| where isnotempty(email)
-| distinct email
-| order by email asc"""
+                        # NOTE: this is the variable's OWN source query —
+                        # it must NOT reference $users (would be self-
+                        # referential and Grafana sends the literal placeholder
+                        # to Azure Monitor, which 400s). Earlier versions of
+                        # this file accidentally had ${users:doublequote}
+                        # injected here by the bulk query-patcher.
+                        "AppTraces\n"
+                        "| where $__timeFilter(TimeGenerated)\n"
+                        "| extend email = tostring(Properties['user.email'])\n"
+                        "| where isnotempty(email)\n"
+                        "| distinct email\n"
+                        "| order by email asc"
                     ),
                     "resource": LA_RESOURCE_VAR,
                     "resultFormat": "table",

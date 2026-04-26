@@ -1767,7 +1767,7 @@
         "query": {
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| extend email = tostring(Properties['user.email'])\n| where isnotempty(email)\n| distinct email\n| order by email asc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| extend email = tostring(Properties['user.email'])\n| where isnotempty(email)\n| distinct email\n| order by email asc",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
