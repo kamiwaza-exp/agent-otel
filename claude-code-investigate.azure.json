@@ -794,6 +794,22 @@
     },
     {
       "id": 515,
+      "type": "text",
+      "title": "About the two views below",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 78,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Coverage model \u2014 read me first.** These two panels are complementary, not redundant.\n\n- **Top slash commands invoked** parses user_prompt text for `/<command>`. Catches every plugin invoked via a slash command (typed by the user), regardless of whether the plugin has hooks. **Doesn't catch** programmatic invocations (Skill tool, Task tool, hook chains).\n- **Marketplace plugin events** shows events emitted by kamiwaza-engineering-marketplace plugins via `tools/emit-event.sh`. Currently this is **hook-based** instrumentation only \u2014 about 10 plugins with hooks (SessionStart / UserPromptSubmit / Pre/PostToolUse / Stop) fire `hook_fired` events when their hooks run. Plugins that only ship commands or skills (no hooks) \u2014 actor-critic, agent-factory, agent-otel, docs-management, kamiwaza, multichannel-discord, obsidian, prd-engine, project-management, research-intelligence, skill-builder, software-design, uat \u2014 **don't show up here yet**. They appear in the slash-command panel when invoked by name. Filling that gap means each plugin's command/skill scripts calling `emit-event.sh` from inside (out of scope for the current instrumentation pass)."
+      }
+    },
+    {
+      "id": 516,
       "type": "table",
       "title": "Top slash commands invoked",
       "description": "Slash commands extracted from user_prompt text via regex (/<name>). Picks up both built-in commands (/help, /clear) and plugin-namespaced commands (/agent-otel:install, /devloop). Doesn't capture programmatic skill invocations via the Skill tool \u2014 those need plugin-side emit (see the Marketplace plugin events panel).",
@@ -803,7 +819,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 78,
+        "y": 82,
         "w": 12,
         "h": 9
       },
@@ -838,17 +854,17 @@
       ]
     },
     {
-      "id": 516,
+      "id": 517,
       "type": "table",
-      "title": "Marketplace plugin events",
-      "description": "Events emitted by kamiwaza-engineering-marketplace plugins via tools/emit-event.sh. Identified by instrumentationlibrary.name starting with 'kz-eng-mp.'. Plugin authors call the helper from their hooks/scripts to record their own usage (event_name + custom attributes).",
+      "title": "Marketplace plugin events (hook-instrumented plugins only)",
+      "description": "Events emitted by kamiwaza-engineering-marketplace plugins via tools/emit-event.sh. Filtered to instrumentationlibrary.name starting with 'kz-eng-mp.'. Currently only the 10 plugins with hooks emit. Plugins with only commands/skills don't appear here \u2014 see the coverage note above.",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "${DS_AZURE_MONITOR}"
       },
       "gridPos": {
         "x": 12,
-        "y": 78,
+        "y": 82,
         "w": 12,
         "h": 9
       },

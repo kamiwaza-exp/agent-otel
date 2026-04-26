@@ -154,6 +154,18 @@ def timeseries_panel(
     }
 
 
+def text_panel(pid, title, x, y, w, h, content):
+    """Markdown text panel — for inline notes / coverage caveats."""
+    return {
+        "id": pid,
+        "type": "text",
+        "title": title,
+        "datasource": None,
+        "gridPos": {"x": x, "y": y, "w": w, "h": h},
+        "options": {"mode": "markdown", "content": content},
+    }
+
+
 def logs_panel(pid, title, x, y, w, h, query, description=""):
     return {
         "id": pid,
@@ -633,11 +645,45 @@ panels.append(
 # marketplace plugins via tools/emit-event.sh.
 panels.append(row("🛠️  Skills & marketplace plugin usage", y=77))
 panels.append(
+    text_panel(
+        next_id(),
+        "About the two views below",
+        0,
+        78,
+        24,
+        4,
+        content=(
+            "**Coverage model — read me first.** These two panels are "
+            "complementary, not redundant.\n\n"
+            "- **Top slash commands invoked** parses user_prompt text "
+            "for `/<command>`. Catches every plugin invoked via a "
+            "slash command (typed by the user), regardless of whether "
+            "the plugin has hooks. **Doesn't catch** programmatic "
+            "invocations (Skill tool, Task tool, hook chains).\n"
+            "- **Marketplace plugin events** shows events emitted by "
+            "kamiwaza-engineering-marketplace plugins via "
+            "`tools/emit-event.sh`. Currently this is **hook-based** "
+            "instrumentation only — about 10 plugins with hooks "
+            "(SessionStart / UserPromptSubmit / Pre/PostToolUse / Stop) "
+            "fire `hook_fired` events when their hooks run. Plugins "
+            "that only ship commands or skills (no hooks) — actor-"
+            "critic, agent-factory, agent-otel, docs-management, "
+            "kamiwaza, multichannel-discord, obsidian, prd-engine, "
+            "project-management, research-intelligence, skill-builder, "
+            "software-design, uat — **don't show up here yet**. They "
+            "appear in the slash-command panel when invoked by name. "
+            "Filling that gap means each plugin's command/skill scripts "
+            "calling `emit-event.sh` from inside (out of scope for the "
+            "current instrumentation pass)."
+        ),
+    )
+)
+panels.append(
     table_panel(
         next_id(),
         "Top slash commands invoked",
         0,
-        78,
+        82,
         12,
         9,
         Q_TOP_SLASH_COMMANDS,
@@ -654,18 +700,19 @@ panels.append(
 panels.append(
     table_panel(
         next_id(),
-        "Marketplace plugin events",
+        "Marketplace plugin events (hook-instrumented plugins only)",
         12,
-        78,
+        82,
         12,
         9,
         Q_MARKETPLACE_USAGE,
         description=(
             "Events emitted by kamiwaza-engineering-marketplace plugins "
-            "via tools/emit-event.sh. Identified by "
+            "via tools/emit-event.sh. Filtered to "
             "instrumentationlibrary.name starting with 'kz-eng-mp.'. "
-            "Plugin authors call the helper from their hooks/scripts to "
-            "record their own usage (event_name + custom attributes)."
+            "Currently only the 10 plugins with hooks emit. Plugins "
+            "with only commands/skills don't appear here — see the "
+            "coverage note above."
         ),
     )
 )
