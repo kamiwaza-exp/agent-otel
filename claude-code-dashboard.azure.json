@@ -95,7 +95,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.session.count\"\n| summarize Sessions = sum(Sum)",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.session.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize Sessions = sum(Sum)",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -167,7 +167,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.cost.usage\"\n| summarize Cost = sum(Sum)",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.cost.usage\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize Cost = sum(Sum)",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -239,7 +239,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.token.usage\"\n| summarize Tokens = sum(Sum)",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.token.usage\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize Tokens = sum(Sum)",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -311,7 +311,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| summarize Lines = sum(Sum)",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize Lines = sum(Sum)",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -418,7 +418,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.cost.usage\"\n| extend p = parse_json(Properties)\n| summarize Cost = sum(Sum) by model = tostring(p.model), bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.cost.usage\"\n| extend p = parse_json(Properties)\n| where tostring(p['user.email']) in (${users:doublequote})\n| summarize Cost = sum(Sum) by model = tostring(p.model), bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -592,7 +592,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.token.usage\"\n| extend p = parse_json(Properties)\n| summarize Tokens = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.token.usage\"\n| extend p = parse_json(Properties)\n| where tostring(p['user.email']) in (${users:doublequote})\n| summarize Tokens = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -728,7 +728,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_request\"\n| summarize Requests = count() by model = tostring(Properties['model']), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"api_request\"\n| summarize Requests = count() by model = tostring(Properties['model']), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -906,7 +906,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize count() by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize count() by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1071,7 +1071,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize count_ = count() by tool_name = tostring(Properties['tool_name'])\n| order by count_ desc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize count_ = count() by tool_name = tostring(Properties['tool_name'])\n| order by count_ desc",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -1172,7 +1172,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n    by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 15m)\n| extend success_rate = iif(total > 0, 100.0 * successes / total, real(null))\n| project TimeGenerated, tool_name, success_rate\n| order by TimeGenerated asc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"tool_result\"\n| summarize\n    total = count(),\n    successes = countif(tostring(Properties['success']) == \"true\")\n    by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 15m)\n| extend success_rate = iif(total > 0, 100.0 * successes / total, real(null))\n| project TimeGenerated, tool_name, success_rate\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1279,7 +1279,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_request\"\n| summarize avg_duration_ms = avg(toint(Properties['duration_ms']))\n    by model = tostring(Properties['model']), bin(TimeGenerated, $__timeInterval)\n| order by TimeGenerated asc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"api_request\"\n| summarize avg_duration_ms = avg(toint(Properties['duration_ms']))\n    by model = tostring(Properties['model']), bin(TimeGenerated, $__timeInterval)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1374,7 +1374,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_error\"\n| summarize errors = count() by status_code = tostring(Properties['status_code']), bin(TimeGenerated, 1m)\n| extend rate_per_sec = errors / 60.0\n| project TimeGenerated, status_code, rate_per_sec\n| order by TimeGenerated asc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"api_error\"\n| summarize errors = count() by status_code = tostring(Properties['status_code']), bin(TimeGenerated, 1m)\n| extend rate_per_sec = errors / 60.0\n| project TimeGenerated, status_code, rate_per_sec\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1480,7 +1480,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend p = parse_json(Properties)\n| summarize Lines = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.lines_of_code.count\"\n| extend p = parse_json(Properties)\n| where tostring(p['user.email']) in (${users:doublequote})\n| summarize Lines = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1575,7 +1575,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| summarize Commits = sum(Sum) by bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.commit.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize Commits = sum(Sum) by bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1589,7 +1589,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| summarize PRs = sum(Sum) by bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where $__timeFilter(TimeGenerated)\n| where Name == \"claude_code.pull_request.count\"\n| extend _p = parse_json(Properties)\n| where tostring(_p['user.email']) in (${users:doublequote})\n| summarize PRs = sum(Sum) by bin(TimeGenerated, 1h)\n| order by TimeGenerated asc",
             "resource": "$law_resource",
             "resultFormat": "time_series"
           },
@@ -1641,7 +1641,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"tool_result\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", tostring(Properties['name']), \"] \",\n        iif(tostring(Properties['success']) == \"true\", \"\u2705\", \"\u274c\"), \" \",\n        tostring(Properties['duration_ms']), \"ms\",\n        iif(isnotempty(tostring(Properties['error'])),\n            strcat(\" ERROR: \", tostring(Properties['error'])),\n            \"\"))\n| order by TimeGenerated desc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"tool_result\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", tostring(Properties['name']), \"] \",\n        iif(tostring(Properties['success']) == \"true\", \"\u2705\", \"\u274c\"), \" \",\n        tostring(Properties['duration_ms']), \"ms\",\n        iif(isnotempty(tostring(Properties['error'])),\n            strcat(\" ERROR: \", tostring(Properties['error'])),\n            \"\"))\n| order by TimeGenerated desc",
             "resource": "$law_resource",
             "resultFormat": "logs"
           },
@@ -1681,7 +1681,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"api_error\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", tostring(Properties['model']), \"] HTTP \",\n        tostring(Properties['status_code']), \" \",\n        tostring(Properties['duration_ms']), \"ms\",\n        \" (attempt \", tostring(Properties['attempt']), \") \",\n        \"ERROR: \", tostring(Properties['error']))\n| order by TimeGenerated desc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"api_error\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", tostring(Properties['model']), \"] HTTP \",\n        tostring(Properties['status_code']), \" \",\n        tostring(Properties['duration_ms']), \"ms\",\n        \" (attempt \", tostring(Properties['attempt']), \") \",\n        \"ERROR: \", tostring(Properties['error']))\n| order by TimeGenerated desc",
             "resource": "$law_resource",
             "resultFormat": "logs"
           },
@@ -1723,7 +1723,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", substring(tostring(Properties['session.id']), 0, 8), \"] \",\n        \"len=\", tostring(Properties['prompt_length']), \" \",\n        iif(isnotempty(tostring(Properties['prompt'])),\n            tostring(Properties['prompt']),\n            \"<prompt text not logged: set OTEL_LOG_USER_PROMPTS=1 on the client>\"))\n| order by TimeGenerated desc",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| project\n    TimeGenerated,\n    Message = strcat(\n        \"[\", substring(tostring(Properties['session.id']), 0, 8), \"] \",\n        \"len=\", tostring(Properties['prompt_length']), \" \",\n        iif(isnotempty(tostring(Properties['prompt'])),\n            tostring(Properties['prompt']),\n            \"<prompt text not logged: set OTEL_LOG_USER_PROMPTS=1 on the client>\"))\n| order by TimeGenerated desc",
             "resource": "$law_resource",
             "resultFormat": "logs"
           },
@@ -1745,7 +1745,7 @@
         "name": "law_resource",
         "type": "textbox",
         "label": "Log Analytics Workspace Resource ID",
-        "description": "Paste the full resource ID, e.g. /subscriptions/xxx/resourceGroups/claude-obs-rg/providers/Microsoft.OperationalInsights/workspaces/claude-obs-law",
+        "description": "Paste the full resource ID, e.g. /subscriptions/xxx/resourceGroups/agent-otel-rg/providers/Microsoft.OperationalInsights/workspaces/agent-otel-law",
         "query": "",
         "current": {
           "selected": false,
@@ -1753,6 +1753,40 @@
           "value": ""
         },
         "hide": 2,
+        "skipUrlSync": false
+      },
+      {
+        "name": "users",
+        "type": "query",
+        "label": "Users",
+        "description": "Multi-select. 'All' expands to every distinct user.email seen in the dashboard window.",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "${DS_AZURE_MONITOR}"
+        },
+        "query": {
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| extend email = tostring(Properties['user.email'])\n| where isnotempty(email)\n| distinct email\n| order by email asc",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "users"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": null,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "hide": 0,
         "skipUrlSync": false
       }
     ]

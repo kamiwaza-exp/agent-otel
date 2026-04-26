@@ -33,10 +33,12 @@ METRICS_KQL_BY_PANEL_ID = {
     1: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.session.count"\n'
-                "| summarize Sessions = sum(Sum)"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.session.count"
+| extend _p = parse_json(Properties)
+| where tostring(_p['user.email']) in (${users:doublequote})
+| summarize Sessions = sum(Sum)"""
             ),
             "resultFormat": "table",
             "legendFormat": "Sessions",
@@ -45,10 +47,12 @@ METRICS_KQL_BY_PANEL_ID = {
     2: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.cost.usage"\n'
-                "| summarize Cost = sum(Sum)"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.cost.usage"
+| extend _p = parse_json(Properties)
+| where tostring(_p['user.email']) in (${users:doublequote})
+| summarize Cost = sum(Sum)"""
             ),
             "resultFormat": "table",
             "legendFormat": "Cost",
@@ -57,10 +61,12 @@ METRICS_KQL_BY_PANEL_ID = {
     3: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.token.usage"\n'
-                "| summarize Tokens = sum(Sum)"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.token.usage"
+| extend _p = parse_json(Properties)
+| where tostring(_p['user.email']) in (${users:doublequote})
+| summarize Tokens = sum(Sum)"""
             ),
             "resultFormat": "table",
             "legendFormat": "Tokens",
@@ -69,10 +75,12 @@ METRICS_KQL_BY_PANEL_ID = {
     4: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.lines_of_code.count"\n'
-                "| summarize Lines = sum(Sum)"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.lines_of_code.count"
+| extend _p = parse_json(Properties)
+| where tostring(_p['user.email']) in (${users:doublequote})
+| summarize Lines = sum(Sum)"""
             ),
             "resultFormat": "table",
             "legendFormat": "Lines",
@@ -82,12 +90,13 @@ METRICS_KQL_BY_PANEL_ID = {
     5: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.cost.usage"\n'
-                "| extend p = parse_json(Properties)\n"
-                "| summarize Cost = sum(Sum) by model = tostring(p.model), bin(TimeGenerated, 1h)\n"
-                "| order by TimeGenerated asc"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.cost.usage"
+| extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
+| summarize Cost = sum(Sum) by model = tostring(p.model), bin(TimeGenerated, 1h)
+| order by TimeGenerated asc"""
             ),
             "resultFormat": "time_series",
             "legendFormat": "{{model}}",
@@ -96,12 +105,13 @@ METRICS_KQL_BY_PANEL_ID = {
     6: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.token.usage"\n'
-                "| extend p = parse_json(Properties)\n"
-                "| summarize Tokens = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n"
-                "| order by TimeGenerated asc"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.token.usage"
+| extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
+| summarize Tokens = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)
+| order by TimeGenerated asc"""
             ),
             "resultFormat": "time_series",
             "legendFormat": "{{type}}",
@@ -112,11 +122,12 @@ METRICS_KQL_BY_PANEL_ID = {
     15: [
         {
             "query": (
-                "AppTraces\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                "| where tostring(Properties['event.name']) == \"api_request\"\n"
-                "| summarize Requests = count() by model = tostring(Properties['model']), bin(TimeGenerated, 5m)\n"
-                "| order by TimeGenerated asc"
+                """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "api_request"
+| summarize Requests = count() by model = tostring(Properties['model']), bin(TimeGenerated, 5m)
+| order by TimeGenerated asc"""
             ),
             "resultFormat": "time_series",
             "legendFormat": "{{model}}",
@@ -125,12 +136,13 @@ METRICS_KQL_BY_PANEL_ID = {
     11: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.lines_of_code.count"\n'
-                "| extend p = parse_json(Properties)\n"
-                "| summarize Lines = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)\n"
-                "| order by TimeGenerated asc"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.lines_of_code.count"
+| extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
+| summarize Lines = sum(Sum) by type = tostring(p.type), bin(TimeGenerated, 5m)
+| order by TimeGenerated asc"""
             ),
             "resultFormat": "time_series",
             "legendFormat": "{{type}}",
@@ -140,11 +152,13 @@ METRICS_KQL_BY_PANEL_ID = {
     12: [
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.commit.count"\n'
-                "| summarize Commits = sum(Sum) by bin(TimeGenerated, 1h)\n"
-                "| order by TimeGenerated asc"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.commit.count"
+| extend _p = parse_json(Properties)
+| where tostring(_p['user.email']) in (${users:doublequote})
+| summarize Commits = sum(Sum) by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc"""
             ),
             "resultFormat": "time_series",
             "legendFormat": "Commits",
@@ -152,11 +166,13 @@ METRICS_KQL_BY_PANEL_ID = {
         },
         {
             "query": (
-                "AppMetrics\n"
-                "| where $__timeFilter(TimeGenerated)\n"
-                '| where Name == "claude_code.pull_request.count"\n'
-                "| summarize PRs = sum(Sum) by bin(TimeGenerated, 1h)\n"
-                "| order by TimeGenerated asc"
+                """AppMetrics
+| where $__timeFilter(TimeGenerated)
+| where Name == "claude_code.pull_request.count"
+| extend _p = parse_json(Properties)
+| where tostring(_p['user.email']) in (${users:doublequote})
+| summarize PRs = sum(Sum) by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc"""
             ),
             "resultFormat": "time_series",
             "legendFormat": "Pull Requests",
@@ -172,59 +188,64 @@ METRICS_KQL_BY_PANEL_ID = {
 KQL_BY_PANEL_ID = {
     7: {
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"tool_result\"\n"
-            "| summarize count() by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 5m)\n"
-            "| order by TimeGenerated asc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "tool_result"
+| summarize count() by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 5m)
+| order by TimeGenerated asc"""
         ),
         "resultFormat": "time_series",
     },
     14: {
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"tool_result\"\n"
-            "| summarize count_ = count() by tool_name = tostring(Properties['tool_name'])\n"
-            "| order by count_ desc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "tool_result"
+| summarize count_ = count() by tool_name = tostring(Properties['tool_name'])
+| order by count_ desc"""
         ),
         "resultFormat": "table",
     },
     8: {
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"tool_result\"\n"
-            "| summarize\n"
-            "    total = count(),\n"
-            "    successes = countif(tostring(Properties['success']) == \"true\")\n"
-            "    by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 15m)\n"
-            "| extend success_rate = iif(total > 0, 100.0 * successes / total, real(null))\n"
-            "| project TimeGenerated, tool_name, success_rate\n"
-            "| order by TimeGenerated asc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "tool_result"
+| summarize
+    total = count(),
+    successes = countif(tostring(Properties['success']) == "true")
+    by tool_name = tostring(Properties['tool_name']), bin(TimeGenerated, 15m)
+| extend success_rate = iif(total > 0, 100.0 * successes / total, real(null))
+| project TimeGenerated, tool_name, success_rate
+| order by TimeGenerated asc"""
         ),
         "resultFormat": "time_series",
     },
     9: {
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"api_request\"\n"
-            "| summarize avg_duration_ms = avg(toint(Properties['duration_ms']))\n"
-            "    by model = tostring(Properties['model']), bin(TimeGenerated, $__timeInterval)\n"
-            "| order by TimeGenerated asc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "api_request"
+| summarize avg_duration_ms = avg(toint(Properties['duration_ms']))
+    by model = tostring(Properties['model']), bin(TimeGenerated, $__timeInterval)
+| order by TimeGenerated asc"""
         ),
         "resultFormat": "time_series",
     },
     10: {
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"api_error\"\n"
-            "| summarize errors = count() by status_code = tostring(Properties['status_code']), bin(TimeGenerated, 1m)\n"
-            "| extend rate_per_sec = errors / 60.0\n"
-            "| project TimeGenerated, status_code, rate_per_sec\n"
-            "| order by TimeGenerated asc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "api_error"
+| summarize errors = count() by status_code = tostring(Properties['status_code']), bin(TimeGenerated, 1m)
+| extend rate_per_sec = errors / 60.0
+| project TimeGenerated, status_code, rate_per_sec
+| order by TimeGenerated asc"""
         ),
         "resultFormat": "time_series",
     },
@@ -234,19 +255,20 @@ KQL_BY_PANEL_ID = {
         # collapse to just the timestamp, which is why the panel showed dates
         # only. strcat-ing a one-line summary recovers the LogQL look.
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"tool_result\"\n"
-            "| project\n"
-            "    TimeGenerated,\n"
-            "    Message = strcat(\n"
-            '        "[", tostring(Properties[\'name\']), "] ",\n'
-            '        iif(tostring(Properties[\'success\']) == "true", "✅", "❌"), " ",\n'
-            "        tostring(Properties['duration_ms']), \"ms\",\n"
-            "        iif(isnotempty(tostring(Properties['error'])),\n"
-            "            strcat(\" ERROR: \", tostring(Properties['error'])),\n"
-            '            ""))\n'
-            "| order by TimeGenerated desc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "tool_result"
+| project
+    TimeGenerated,
+    Message = strcat(
+        "[", tostring(Properties['name']), "] ",
+        iif(tostring(Properties['success']) == "true", "✅", "❌"), " ",
+        tostring(Properties['duration_ms']), "ms",
+        iif(isnotempty(tostring(Properties['error'])),
+            strcat(" ERROR: ", tostring(Properties['error'])),
+            ""))
+| order by TimeGenerated desc"""
         ),
         "resultFormat": "logs",
     },
@@ -254,18 +276,19 @@ KQL_BY_PANEL_ID = {
         # Same Message-column synthesis as panel 13. api_error always carries
         # an error attribute, so no isnotempty guard needed.
         "query": (
-            "AppTraces\n"
-            "| where $__timeFilter(TimeGenerated)\n"
-            "| where tostring(Properties['event.name']) == \"api_error\"\n"
-            "| project\n"
-            "    TimeGenerated,\n"
-            "    Message = strcat(\n"
-            '        "[", tostring(Properties[\'model\']), "] HTTP ",\n'
-            "        tostring(Properties['status_code']), \" \",\n"
-            "        tostring(Properties['duration_ms']), \"ms\",\n"
-            '        " (attempt ", tostring(Properties[\'attempt\']), ") ",\n'
-            "        \"ERROR: \", tostring(Properties['error']))\n"
-            "| order by TimeGenerated desc"
+            """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "api_error"
+| project
+    TimeGenerated,
+    Message = strcat(
+        "[", tostring(Properties['model']), "] HTTP ",
+        tostring(Properties['status_code']), " ",
+        tostring(Properties['duration_ms']), "ms",
+        " (attempt ", tostring(Properties['attempt']), ") ",
+        "ERROR: ", tostring(Properties['error']))
+| order by TimeGenerated desc"""
         ),
         "resultFormat": "logs",
     },
@@ -364,18 +387,19 @@ def make_user_prompts_panel() -> dict:
                 "queryType": "Azure Log Analytics",
                 "azureLogAnalytics": {
                     "query": (
-                        "AppTraces\n"
-                        "| where $__timeFilter(TimeGenerated)\n"
-                        "| where tostring(Properties['event.name']) == \"user_prompt\"\n"
-                        "| project\n"
-                        "    TimeGenerated,\n"
-                        "    Message = strcat(\n"
-                        '        "[", substring(tostring(Properties[\'session.id\']), 0, 8), "] ",\n'
-                        '        "len=", tostring(Properties[\'prompt_length\']), " ",\n'
-                        "        iif(isnotempty(tostring(Properties['prompt'])),\n"
-                        "            tostring(Properties['prompt']),\n"
-                        '            "<prompt text not logged: set OTEL_LOG_USER_PROMPTS=1 on the client>"))\n'
-                        "| order by TimeGenerated desc"
+                        """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| where tostring(Properties['event.name']) == "user_prompt"
+| project
+    TimeGenerated,
+    Message = strcat(
+        "[", substring(tostring(Properties['session.id']), 0, 8), "] ",
+        "len=", tostring(Properties['prompt_length']), " ",
+        iif(isnotempty(tostring(Properties['prompt'])),
+            tostring(Properties['prompt']),
+            "<prompt text not logged: set OTEL_LOG_USER_PROMPTS=1 on the client>"))
+| order by TimeGenerated desc"""
                     ),
                     "resource": LA_RESOURCE_VAR,
                     "resultFormat": "logs",
@@ -525,24 +549,58 @@ def main():
         },
     ]
 
-    # Add a law_resource dashboard variable so every KQL query can reference
-    # the Log Analytics workspace without hardcoding subscription/resource-group.
+    # Dashboard variables: $law_resource (hidden, populated by upload script)
+    # and $users (multi-select, all-by-default). Both KQL types apply user
+    # filtering — for AppTraces directly, for AppMetrics via parse_json.
     templating = dst.setdefault("templating", {"list": []})
     tvars = templating.setdefault("list", [])
-    # Remove pre-existing law_resource to keep re-runs idempotent.
-    tvars = [v for v in tvars if v.get("name") != "law_resource"]
+    # Strip any pre-existing copies so re-runs are idempotent.
+    tvars = [v for v in tvars if v.get("name") not in ("law_resource", "users")]
     tvars.insert(
         0,
         {
             "name": "law_resource",
             "type": "textbox",
             "label": "Log Analytics Workspace Resource ID",
-            "description": "Paste the full resource ID, e.g. /subscriptions/xxx/resourceGroups/claude-obs-rg/providers/Microsoft.OperationalInsights/workspaces/claude-obs-law",
+            "description": "Paste the full resource ID, e.g. /subscriptions/xxx/resourceGroups/agent-otel-rg/providers/Microsoft.OperationalInsights/workspaces/agent-otel-law",
             "query": "",
             "current": {"selected": False, "text": "", "value": ""},
             "hide": 2,
             "skipUrlSync": False,
         },
+    )
+    tvars.append(
+        {
+            "name": "users",
+            "type": "query",
+            "label": "Users",
+            "description": "Multi-select. 'All' expands to every distinct user.email seen in the dashboard window.",
+            "datasource": AZURE_DS,
+            "query": {
+                "queryType": "Azure Log Analytics",
+                "azureLogAnalytics": {
+                    "query": (
+                        """AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
+| extend email = tostring(Properties['user.email'])
+| where isnotempty(email)
+| distinct email
+| order by email asc"""
+                    ),
+                    "resource": LA_RESOURCE_VAR,
+                    "resultFormat": "table",
+                },
+                "refId": "users",
+            },
+            "refresh": 2,
+            "multi": True,
+            "includeAll": True,
+            "allValue": None,
+            "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
+            "hide": 0,
+            "skipUrlSync": False,
+        }
     )
     templating["list"] = tvars
 

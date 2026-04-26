@@ -190,6 +190,7 @@ def row(title: str, y: int) -> dict:
 
 Q_ACTIVE_USERS_1D = """AppTraces
 | where TimeGenerated > ago(1d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend email = tostring(Properties['user.email'])
 | where isnotempty(email)
 | summarize count_distinct = dcount(email)
@@ -197,6 +198,7 @@ Q_ACTIVE_USERS_1D = """AppTraces
 
 Q_ACTIVE_USERS_7D = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend email = tostring(Properties['user.email'])
 | where isnotempty(email)
 | summarize count_distinct = dcount(email)
@@ -204,6 +206,7 @@ Q_ACTIVE_USERS_7D = """AppTraces
 
 Q_ACTIVE_HOSTS_7D = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend host = tostring(Properties['host.name'])
 | where isnotempty(host)
 | summarize count_distinct = dcount(host)
@@ -211,6 +214,7 @@ Q_ACTIVE_HOSTS_7D = """AppTraces
 
 Q_ACTIVE_PROJECTS_7D = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend proj = tostring(Properties['project.name'])
 | where isnotempty(proj)
 | summarize count_distinct = dcount(proj)
@@ -218,6 +222,7 @@ Q_ACTIVE_PROJECTS_7D = """AppTraces
 
 Q_DAU_30D = """AppTraces
 | where TimeGenerated > ago(30d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend email = tostring(Properties['user.email'])
 | where isnotempty(email)
 | summarize DAU = dcount(email) by bin(TimeGenerated, 1d)
@@ -226,6 +231,7 @@ Q_DAU_30D = """AppTraces
 
 Q_USERS_7D_DETAIL = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend email = tostring(Properties['user.email'])
 | where isnotempty(email)
 | summarize
@@ -239,6 +245,7 @@ Q_USERS_7D_DETAIL = """AppTraces
 
 Q_BY_USERNAME = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend email = tostring(Properties['user.email'])
 | where isnotempty(email)
 | extend username = tostring(split(email, "@")[0])
@@ -252,6 +259,7 @@ Q_BY_USERNAME = """AppTraces
 
 Q_ACTIVE_HOURS_BY_USER = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | where tostring(Properties['event.name']) == "user_prompt"
 | extend email = tostring(Properties['user.email'])
 | extend hour_bucket = bin(TimeGenerated, 1h)
@@ -261,6 +269,7 @@ Q_ACTIVE_HOURS_BY_USER = """AppTraces
 
 Q_HOUR_OF_DAY = """AppTraces
 | where TimeGenerated > ago(30d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | where tostring(Properties['event.name']) == "user_prompt"
 // Per-user timezone shift before bucketing by hour. host.tz_offset_minutes
 // is set by the agent-otel launcher; records without it default to UTC.
@@ -275,6 +284,7 @@ Q_HOUR_OF_DAY = """AppTraces
 
 Q_TOP_PROJECTS = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | extend proj = tostring(Properties['project.name'])
 | where isnotempty(proj)
 | summarize
@@ -289,6 +299,7 @@ Q_COST_BY_USER = """AppMetrics
 | where TimeGenerated > ago(7d)
 | where Name == "claude_code.cost.usage"
 | extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
 | extend email = tostring(p['user.email'])
 | summarize Cost = sum(Sum) by email
 | top 10 by Cost desc
@@ -298,6 +309,7 @@ Q_COST_BY_USERNAME = """AppMetrics
 | where TimeGenerated > ago(7d)
 | where Name == "claude_code.cost.usage"
 | extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
 | extend email = tostring(p['user.email'])
 | extend username = tostring(split(email, "@")[0])
 | summarize Cost = sum(Sum), Accounts = make_set(email) by username
@@ -308,6 +320,7 @@ Q_COST_BY_PROJECT = """AppMetrics
 | where TimeGenerated > ago(7d)
 | where Name == "claude_code.cost.usage"
 | extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
 | extend proj = tostring(p['project.name'])
 | where isnotempty(proj)
 | summarize Cost = sum(Sum) by proj
@@ -318,6 +331,7 @@ Q_COST_BY_MODEL = """AppMetrics
 | where TimeGenerated > ago(7d)
 | where Name == "claude_code.cost.usage"
 | extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
 | extend model = tostring(p['model'])
 | summarize Cost = sum(Sum) by model
 | order by Cost desc
@@ -327,6 +341,7 @@ Q_TOKENS_BY_TYPE = """AppMetrics
 | where TimeGenerated > ago(7d)
 | where Name == "claude_code.token.usage"
 | extend p = parse_json(Properties)
+| where tostring(p['user.email']) in (${users:doublequote})
 | extend type = tostring(p['type'])
 | summarize Tokens = sum(Sum) by type
 | order by Tokens desc
@@ -334,6 +349,7 @@ Q_TOKENS_BY_TYPE = """AppMetrics
 
 Q_TOP_TOOLS = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | where tostring(Properties['event.name']) == "tool_result"
 | summarize calls = count() by tool = tostring(Properties['tool_name'])
 | order by calls desc
@@ -341,6 +357,7 @@ Q_TOP_TOOLS = """AppTraces
 
 Q_TOOL_SUCCESS = """AppTraces
 | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | where tostring(Properties['event.name']) == "tool_result"
 | summarize
     total = count(),
@@ -352,6 +369,7 @@ Q_TOOL_SUCCESS = """AppTraces
 
 Q_TOOLS_PER_PROMPT = """let prompts = AppTraces
   | where TimeGenerated > ago(7d)
+| where tostring(Properties['user.email']) in (${users:doublequote})
   | where tostring(Properties['event.name']) == "user_prompt"
   | summarize prompts = count() by email = tostring(Properties['user.email']);
 let tools = AppTraces
@@ -366,6 +384,7 @@ prompts
 
 Q_RECENT_PROMPTS = """AppTraces
 | where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | where tostring(Properties['event.name']) == "user_prompt"
 | project
     TimeGenerated,
@@ -381,6 +400,7 @@ Q_RECENT_PROMPTS = """AppTraces
 
 Q_RECENT_ERRORS = """AppTraces
 | where $__timeFilter(TimeGenerated)
+| where tostring(Properties['user.email']) in (${users:doublequote})
 | where tostring(Properties['event.name']) == "api_error"
 | project
     TimeGenerated,
@@ -537,7 +557,37 @@ dashboard = {
                 "current": {"selected": False, "text": "", "value": ""},
                 "hide": 2,
                 "skipUrlSync": False,
-            }
+            },
+            {
+                "name": "users",
+                "type": "query",
+                "label": "Users",
+                "description": "Multi-select. 'All' expands to every distinct user.email seen in the dashboard window.",
+                "datasource": AZURE_DS,
+                "query": {
+                    "queryType": "Azure Log Analytics",
+                    "azureLogAnalytics": {
+                        "query": (
+                            "AppTraces\n"
+                            "| where $__timeFilter(TimeGenerated)\n"
+                            "| extend email = tostring(Properties['user.email'])\n"
+                            "| where isnotempty(email)\n"
+                            "| distinct email\n"
+                            "| order by email asc"
+                        ),
+                        "resource": LA_RESOURCE_VAR,
+                        "resultFormat": "table",
+                    },
+                    "refId": "users",
+                },
+                "refresh": 2,
+                "multi": True,
+                "includeAll": True,
+                "allValue": None,
+                "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
+                "hide": 0,
+                "skipUrlSync": False,
+            },
         ]
     },
     "time": {"from": "now-7d", "to": "now"},
