@@ -6,9 +6,14 @@
 # Data flow:
 #   OTLP in (4317/4318)
 #     ├─ metrics → azuremonitor → Application Insights → AppMetrics table in LA
-#     └─ logs    → azuremonitor → Application Insights → AppTraces  table in LA
+#     ├─ logs    → azuremonitor → Application Insights → AppTraces  table in LA
+#     └─ traces  → azuremonitor → Application Insights → AppRequests / AppDependencies tables in LA
 #
-# Both signals share the same exporter and the same connection-string auth.
+# Traces are populated only when clients run with
+# CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1 + OTEL_TRACES_EXPORTER=otlp (the
+# wrapper installer in the marketplace plugin sets these).
+#
+# All three signals share the same exporter and the same connection-string auth.
 # No Managed Identity, no DCE, no azureauth extension — this was originally a
 # split design with metrics going to Managed Prometheus via prometheusremotewrite
 # + azureauth, but the azureauth extension (flagged Alpha in otel-contrib)
@@ -228,6 +233,15 @@ service:
       # Redaction must happen before batch so individual records are scrubbed
       # before any cross-record grouping; before export so cleartext never leaves.
       processors: [memory_limiter, resource, transform/redact_secrets, batch]
+      exporters: [azuremonitor]
+    traces:
+      receivers: [otlp]
+      # No redaction here. transform/redact_secrets uses log_statements and
+      # only operates on log records — span attributes (including tool I/O
+      # content under enhanced telemetry beta) pass through unredacted.
+      # Acceptable for v1 because this exporter targets a private team
+      # tenant. Revisit (add trace_statements rules) if scope broadens.
+      processors: [memory_limiter, resource, batch]
       exporters: [azuremonitor]
   telemetry:
     # Collector self-telemetry. Useful when debugging why data isn't flowing.
