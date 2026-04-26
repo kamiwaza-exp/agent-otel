@@ -384,6 +384,43 @@ Q_TOOL_DECISIONS = f"""AppTraces
 | order by tool asc
 """
 
+# Slash commands extracted from user_prompt text. Useful for "which
+# skills/commands is the team running?" without per-plugin instrumentation.
+# Pattern matches `/<name>` at the start of the prompt; supports the
+# Anthropic-style namespaced form (e.g. /agent-otel:install).
+Q_TOP_SLASH_COMMANDS = f"""AppTraces
+| where $__timeFilter(TimeGenerated)
+| where tostring(Properties['event.name']) == "user_prompt"
+{USER_FILTER}
+{PROJECT_FILTER}
+| extend prompt = tostring(Properties['prompt'])
+| extend command = extract(@"^(/[a-zA-Z0-9:_\\-]+)", 1, prompt)
+| where isnotempty(command)
+| summarize uses = count(),
+            users = dcount(tostring(Properties['user.email']))
+  by command
+| order by uses desc
+"""
+
+# Marketplace plugin events emitted by tools/emit-event.sh in the
+# kamiwaza-engineering-marketplace. The helper sets
+# instrumentationlibrary.name = "kz-eng-mp.<plugin>", so we filter on
+# that prefix to separate marketplace events from Claude Code's own
+# event stream. Each plugin defines its own event_name + custom attrs.
+Q_MARKETPLACE_USAGE = f"""AppTraces
+| where $__timeFilter(TimeGenerated)
+| extend lib = tostring(Properties['instrumentationlibrary.name'])
+| where lib startswith "kz-eng-mp."
+{USER_FILTER}
+{PROJECT_FILTER}
+| extend plugin = substring(lib, strlen("kz-eng-mp."))
+| extend event_name = tostring(Properties['event.name'])
+| summarize fires = count(),
+            users = dcount(tostring(Properties['user.email']))
+  by plugin, event_name
+| order by fires desc
+"""
+
 # Recent API errors in scope.
 Q_API_ERRORS_MATCHING = f"""AppTraces
 | where $__timeFilter(TimeGenerated)
@@ -588,6 +625,48 @@ panels.append(
         10,
         Q_API_ERRORS_MATCHING,
         description="api_error events matching the filters.",
+    )
+)
+
+# Section: Skills & marketplace usage — what people are invoking via
+# slash commands (parsed from prompt text) + events emitted by
+# marketplace plugins via tools/emit-event.sh.
+panels.append(row("🛠️  Skills & marketplace plugin usage", y=77))
+panels.append(
+    table_panel(
+        next_id(),
+        "Top slash commands invoked",
+        0,
+        78,
+        12,
+        9,
+        Q_TOP_SLASH_COMMANDS,
+        description=(
+            "Slash commands extracted from user_prompt text via regex "
+            "(/<name>). Picks up both built-in commands (/help, /clear) "
+            "and plugin-namespaced commands (/agent-otel:install, "
+            "/devloop). Doesn't capture programmatic skill invocations "
+            "via the Skill tool — those need plugin-side emit (see the "
+            "Marketplace plugin events panel)."
+        ),
+    )
+)
+panels.append(
+    table_panel(
+        next_id(),
+        "Marketplace plugin events",
+        12,
+        78,
+        12,
+        9,
+        Q_MARKETPLACE_USAGE,
+        description=(
+            "Events emitted by kamiwaza-engineering-marketplace plugins "
+            "via tools/emit-event.sh. Identified by "
+            "instrumentationlibrary.name starting with 'kz-eng-mp.'. "
+            "Plugin authors call the helper from their hooks/scripts to "
+            "record their own usage (event_name + custom attributes)."
+        ),
     )
 )
 

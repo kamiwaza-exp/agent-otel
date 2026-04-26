@@ -780,6 +780,107 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udee0\ufe0f  Skills & marketplace plugin usage",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "collapsed": false
+    },
+    {
+      "id": 515,
+      "type": "table",
+      "title": "Top slash commands invoked",
+      "description": "Slash commands extracted from user_prompt text via regex (/<name>). Picks up both built-in commands (/help, /clear) and plugin-namespaced commands (/agent-otel:install, /devloop). Doesn't capture programmatic skill invocations via the Skill tool \u2014 those need plugin-side emit (see the Marketplace plugin events panel).",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 78,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['event.name']) == \"user_prompt\"\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where isempty(tostring(Properties['project.name'])) or tostring(Properties['project.name']) in (${projects:doublequote})\n| extend prompt = tostring(Properties['prompt'])\n| extend command = extract(@\"^(/[a-zA-Z0-9:_\\-]+)\", 1, prompt)\n| where isnotempty(command)\n| summarize uses = count(),\n            users = dcount(tostring(Properties['user.email']))\n  by command\n| order by uses desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 516,
+      "type": "table",
+      "title": "Marketplace plugin events",
+      "description": "Events emitted by kamiwaza-engineering-marketplace plugins via tools/emit-event.sh. Identified by instrumentationlibrary.name starting with 'kz-eng-mp.'. Plugin authors call the helper from their hooks/scripts to record their own usage (event_name + custom attributes).",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 78,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| extend lib = tostring(Properties['instrumentationlibrary.name'])\n| where lib startswith \"kz-eng-mp.\"\n| where tostring(Properties['user.email']) in (${users:doublequote})\n| where isempty(tostring(Properties['project.name'])) or tostring(Properties['project.name']) in (${projects:doublequote})\n| extend plugin = substring(lib, strlen(\"kz-eng-mp.\"))\n| extend event_name = tostring(Properties['event.name'])\n| summarize fires = count(),\n            users = dcount(tostring(Properties['user.email']))\n  by plugin, event_name\n| order by fires desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "5m",
