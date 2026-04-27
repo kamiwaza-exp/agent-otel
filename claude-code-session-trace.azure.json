@@ -75,7 +75,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend email = tostring(Properties['user.email']), proj = tostring(Properties['project.name'])\n| summarize email=any(email), proj=any(proj)\n| extend display = iff(isempty(proj), email, strcat(email, ' \u2022 ', proj))\n| project display\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| extend email = tostring(Properties['user.email']), proj = tostring(Properties['project.name'])\n| summarize users = dcount(email), projects = dcount(proj),\n            email = any(email), proj = any(proj)\n| extend display = iff(${session_id:singlequote} == '__all__',\n                       strcat(users, ' users \u2022 ', projects, ' projects'),\n                       iff(isempty(proj), email, strcat(email, ' \u2022 ', proj)))\n| project display\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -137,7 +137,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| summarize started = min(TimeGenerated), ended = max(TimeGenerated)\n| extend duration_min = round(todouble(datetime_diff('second', ended, started)) / 60.0, 1)\n| project duration_min\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| summarize started = min(TimeGenerated), ended = max(TimeGenerated)\n| extend duration_min = round(todouble(datetime_diff('second', ended, started)) / 60.0, 1)\n| project duration_min\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -199,7 +199,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| where tostring(Properties['event.name']) == 'api_request'\n| extend cost = todouble(Properties['cost_usd'])\n| summarize total_cost = sum(cost)\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| where tostring(Properties['event.name']) == 'api_request'\n| extend cost = todouble(Properties['cost_usd'])\n| summarize total_cost = sum(cost)\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -261,7 +261,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| where tostring(Properties['event.name']) == 'api_request'\n| extend in_tok = toint(Properties['input_tokens']),\n         out_tok = toint(Properties['output_tokens'])\n| summarize total_tokens = sum(in_tok) + sum(out_tok)\n",
+            "query": "AppTraces\n| where $__timeFilter(TimeGenerated)\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| where tostring(Properties['event.name']) == 'api_request'\n| extend in_tok = toint(Properties['input_tokens']),\n         out_tok = toint(Properties['output_tokens'])\n| summarize total_tokens = sum(in_tok) + sum(out_tok)\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -313,7 +313,7 @@
                 "value": [
                   {
                     "title": "Load this prompt's trace \u2193",
-                    "url": "/d/agent-otel-session-trace?${__url_time_range}&var-session_id=${session_id}&var-operation_id=${__data.fields.OperationId}",
+                    "url": "/d/agent-otel-session-trace?${__url_time_range}&var-session_id=${__data.fields.SessionId}&var-operation_id=${__data.fields.OperationId}",
                     "targetBlank": false
                   }
                 ]
@@ -427,7 +427,131 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Name == 'claude_code.interaction'\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend full_prompt = tostring(Properties['user_prompt']),\n         prompt_len = toint(Properties['user_prompt_length']),\n         seq = toint(Properties['interaction.sequence']),\n         status_code = tostring(Properties['otel.status_code'])\n| extend preview = iff(strlen(full_prompt) > 140,\n                       strcat(substring(full_prompt, 0, 140), '\u2026'),\n                       full_prompt)\n| project ['#'] = seq,\n          started = TimeGenerated,\n          duration_ms = DurationMs,\n          chars = prompt_len,\n          status_code,\n          OperationId,\n          prompt = preview\n| order by started asc\n",
+            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Name == 'claude_code.interaction'\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| extend full_prompt = tostring(Properties['user_prompt']),\n         prompt_len = toint(Properties['user_prompt_length']),\n         seq = toint(Properties['interaction.sequence']),\n         status_code = tostring(Properties['otel.status_code']),\n         email = tostring(Properties['user.email']),\n         sess = tostring(Properties['session.id'])\n| extend preview = iff(strlen(full_prompt) > 140,\n                       strcat(substring(full_prompt, 0, 140), '\u2026'),\n                       full_prompt)\n| project ['#'] = seq,\n          started = TimeGenerated,\n          user = email,\n          prompt = preview,\n          session_short = substring(sess, 0, 8),\n          duration_ms = DurationMs,\n          chars = prompt_len,\n          status_code,\n          OperationId,\n          SessionId = sess\n| order by started desc\n",
+            "resource": "$law_resource",
+            "resultFormat": "table"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "\ud83d\udde3\ufe0f Conversation thread \u2014 pick a session above (only shown when scoped to one session)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "collapsed": false
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Conversation",
+      "description": "Interleaved user prompts, assistant responses, and tool calls from the selected session, ordered by event.sequence. Assistant text is parsed from api_response_body events \u2014 requires OTEL_LOG_RAW_API_BODIES=1 in the client's settings.json. Tool result content is NOT captured (only size); tool_input (args) is shown truncated to 600 chars.",
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "${DS_AZURE_MONITOR}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "content"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 600
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "role"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "#"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "prompt_id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "${DS_AZURE_MONITOR}"
+          },
+          "queryType": "Azure Log Analytics",
+          "azureLogAnalytics": {
+            "query": "let sf = ${session_id:singlequote};\nlet user_turns = AppTraces\n| where $__timeFilter(TimeGenerated)\n| where sf != '__all__'\n| where tostring(Properties['session.id']) == sf\n| where tostring(Properties['event.name']) == 'user_prompt'\n| extend seq = toint(Properties['event.sequence']),\n         pid = tostring(Properties['prompt.id']),\n         role = '\ud83e\uddd1 user',\n         content = tostring(Properties['prompt'])\n| project TimeGenerated, seq, pid, role, content;\nlet assistant_turns = AppTraces\n| where $__timeFilter(TimeGenerated)\n| where sf != '__all__'\n| where tostring(Properties['session.id']) == sf\n| where tostring(Properties['event.name']) == 'api_response_body'\n| extend seq = toint(Properties['event.sequence']),\n         pid = tostring(Properties['prompt.id']),\n         body_obj = parse_json(tostring(Properties['body']))\n| mv-expand blk = body_obj.content\n| extend block_text = case(\n    tostring(blk.type) == 'text', tostring(blk.text),\n    tostring(blk.type) == 'tool_use',\n        strcat('\ud83d\udd28 calling ', tostring(blk.name), '(',\n               substring(tostring(blk.input), 0, 200), ')'),\n    strcat('[', tostring(blk.type), ' block]'))\n| summarize content = strcat_array(make_list(block_text), '\\n\\n')\n            by TimeGenerated, seq, pid\n| extend role = '\ud83e\udd16 assistant'\n| project TimeGenerated, seq, pid, role, content;\nlet tool_turns = AppTraces\n| where $__timeFilter(TimeGenerated)\n| where sf != '__all__'\n| where tostring(Properties['session.id']) == sf\n| where tostring(Properties['event.name']) == 'tool_result'\n| extend seq = toint(Properties['event.sequence']),\n         pid = tostring(Properties['prompt.id']),\n         tn = tostring(Properties['tool_name']),\n         success = tostring(Properties['success']),\n         dur = tostring(Properties['duration_ms']),\n         input_preview = substring(tostring(Properties['tool_input']), 0, 600),\n         result_size = tostring(Properties['tool_result_size_bytes'])\n| extend role = strcat('\ud83d\udd27 ', tn),\n         content = strcat('[success=', success, ' \u00b7 ', dur, 'ms \u00b7 result_size=',\n                          result_size, 'B]\\n', input_preview)\n| project TimeGenerated, seq, pid, role, content;\nunion user_turns, assistant_turns, tool_turns\n| order by seq asc\n| project started = TimeGenerated, ['#'] = seq, role, content, prompt_id = pid\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -442,12 +566,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 40
       },
       "collapsed": false
     },
     {
-      "id": 6,
+      "id": 7,
       "type": "traces",
       "title": "Trace waterfall",
       "description": "Click a row in the prompts table above to populate $operation_id. Then this panel renders the full span tree (claude_code.interaction \u2192 llm_request \u2192 tool \u2192 tool.execution) as a collapsible waterfall.",
@@ -457,7 +581,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 41,
         "w": 24,
         "h": 22
       },
@@ -487,12 +611,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 63
       },
       "collapsed": false
     },
     {
-      "id": 7,
+      "id": 8,
       "type": "table",
       "title": "Spans (filtered by $search)",
       "description": "All spans for the selected session. Type in $search above to filter by span name or any attribute value (case-sensitive substring). Up to 500 rows.",
@@ -502,7 +626,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 41,
+        "y": 64,
         "w": 24,
         "h": 14
       },
@@ -560,7 +684,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend props_text = tostring(Properties)\n| where '${search}' == '' or Name contains_cs '${search}' or props_text contains_cs '${search}'\n| extend tool = tostring(Properties['tool_name']),\n         model = tostring(Properties['gen_ai.request.model']),\n         status_code = tostring(Properties['otel.status_code']),\n         full_command = tostring(Properties['full_command'])\n| project started = TimeGenerated, span = Name, tool, model, full_command,\n          duration_ms = DurationMs, status_code, OperationId, Id, ParentId\n| order by started asc\n| take 500\n",
+            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| extend props_text = tostring(Properties)\n| where '${search}' == '' or Name contains_cs '${search}' or props_text contains_cs '${search}'\n| extend tool = tostring(Properties['tool_name']),\n         model = tostring(Properties['gen_ai.request.model']),\n         status_code = tostring(Properties['otel.status_code']),\n         full_command = tostring(Properties['full_command'])\n| project started = TimeGenerated, span = Name, tool, model, full_command,\n          duration_ms = DurationMs, status_code, OperationId, Id, ParentId\n| order by started asc\n| take 500\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -575,12 +699,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 78
       },
       "collapsed": false
     },
     {
-      "id": 8,
+      "id": 9,
       "type": "table",
       "title": "Tool usage breakdown",
       "description": "Aggregated over claude_code.tool.execution spans for this session.",
@@ -590,7 +714,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 79,
         "w": 12,
         "h": 10
       },
@@ -616,7 +740,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Name == 'claude_code.tool.execution'\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend tool = tostring(Properties['tool_name'])\n| where isnotempty(tool)\n| summarize calls = count(),\n            total_ms = sum(DurationMs),\n            avg_ms = round(avg(DurationMs), 0),\n            p95_ms = round(percentile(DurationMs, 95), 0)\n            by tool\n| order by total_ms desc\n",
+            "query": "AppDependencies\n| where $__timeFilter(TimeGenerated)\n| where Name == 'claude_code.tool.execution'\n| where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n| extend tool = tostring(Properties['tool_name'])\n| where isnotempty(tool)\n| summarize calls = count(),\n            total_ms = sum(DurationMs),\n            avg_ms = round(avg(DurationMs), 0),\n            p95_ms = round(percentile(DurationMs, 95), 0)\n            by tool\n| order by total_ms desc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -625,7 +749,7 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "type": "table",
       "title": "Errors & rejected tools",
       "description": "Span-level errors (otel.status_code=ERROR) and tool decisions where the user rejected the tool call.",
@@ -635,7 +759,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 56,
+        "y": 79,
         "w": 12,
         "h": 10
       },
@@ -661,7 +785,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "union\n  (AppDependencies\n   | where $__timeFilter(TimeGenerated)\n   | where tostring(Properties['session.id']) == '${session_id}'\n   | where tostring(Properties['otel.status_code']) == 'ERROR'\n   | extend entry_kind = 'span_error', detail = Name),\n  (AppTraces\n   | where $__timeFilter(TimeGenerated)\n   | where tostring(Properties['session.id']) == '${session_id}'\n   | where tostring(Properties['event.name']) == 'tool_decision'\n       and tostring(Properties['decision_type']) == 'reject'\n   | extend entry_kind = 'tool_rejected', detail = tostring(Properties['tool_name']))\n| project started = TimeGenerated, entry_kind, detail\n| order by started asc\n",
+            "query": "union\n  (AppDependencies\n   | where $__timeFilter(TimeGenerated)\n   | where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n   | where tostring(Properties['otel.status_code']) == 'ERROR'\n   | extend entry_kind = 'span_error', detail = Name),\n  (AppTraces\n   | where $__timeFilter(TimeGenerated)\n   | where ${session_id:singlequote} == '__all__' or tostring(Properties['session.id']) == ${session_id:singlequote}\n   | where tostring(Properties['event.name']) == 'tool_decision'\n       and tostring(Properties['decision_type']) == 'reject'\n   | extend entry_kind = 'tool_rejected', detail = tostring(Properties['tool_name']))\n| project started = TimeGenerated, entry_kind, detail\n| order by started asc\n",
             "resource": "$law_resource",
             "resultFormat": "table"
           },
@@ -712,7 +836,7 @@
         "name": "session_id",
         "type": "query",
         "label": "Session",
-        "description": "Recent sessions (last 7 days) ordered by start time. Label format: <email> \u00b7 <date> \u00b7 <prompt_count>p. Only sessions that have at least one claude_code.interaction span (i.e., emitted with beta tracing on) appear here.",
+        "description": "Default 'All sessions' shows every claude_code.interaction in the time range. Pick a specific session to scope drill-downs and the trace waterfall. Label format: <email> \u00b7 <date> \u00b7 <prompt_count>p (last 7 days, top 100 by recency).",
         "datasource": {
           "type": "grafana-azure-monitor-datasource",
           "uid": "${DS_AZURE_MONITOR}"
@@ -726,38 +850,24 @@
           },
           "refId": "session_id"
         },
-        "refresh": 2,
+        "refresh": 1,
         "multi": false,
-        "includeAll": false,
+        "includeAll": true,
+        "allValue": "__all__",
         "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
+          "selected": true,
+          "text": "All",
+          "value": "__all__"
         },
         "hide": 0,
         "skipUrlSync": false
       },
       {
         "name": "operation_id",
-        "type": "query",
+        "type": "textbox",
         "label": "Operation ID",
-        "description": "Auto-populated from interactions in the selected session, newest first. Default selection is the most recent prompt's trace; click any other prompt row to switch.",
-        "datasource": {
-          "type": "grafana-azure-monitor-datasource",
-          "uid": "${DS_AZURE_MONITOR}"
-        },
-        "query": {
-          "queryType": "Azure Log Analytics",
-          "azureLogAnalytics": {
-            "query": "AppDependencies\n| where TimeGenerated > ago(7d)\n| where Name == 'claude_code.interaction'\n| where tostring(Properties['session.id']) == '${session_id}'\n| extend seq = toint(Properties['interaction.sequence']),\n         preview = substring(tostring(Properties['user_prompt']), 0, 60)\n| order by TimeGenerated desc\n| take 50\n| project __value = OperationId,\n          __text = strcat('#', seq, ' \u00b7 ', preview)",
-            "resource": "$law_resource",
-            "resultFormat": "table"
-          },
-          "refId": "operation_id"
-        },
-        "refresh": 2,
-        "multi": false,
-        "includeAll": false,
+        "description": "Empty by default \u2014 the trace waterfall stays empty until you click a row in the Prompts table to load that prompt's trace. You can also paste an OperationId here directly.",
+        "query": "",
         "current": {
           "selected": false,
           "text": "",

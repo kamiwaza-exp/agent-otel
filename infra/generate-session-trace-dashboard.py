@@ -142,9 +142,21 @@ def row(title, y, collapsed=False):
 
 
 # ── shared filter clauses ─────────────────────────────────────────────
+#
+# session_id supports an "All sessions" option (sentinel value `__all__`,
+# set as the variable's allValue). When that sentinel is selected the
+# session predicate becomes a no-op so the dashboard shows every
+# interaction in the current time range. Otherwise the filter narrows to
+# the picked session.
 
-SESSION_FILTER_TRACES = "| where tostring(Properties['session.id']) == '${session_id}'"
-SESSION_FILTER_DEPS = "| where tostring(Properties['session.id']) == '${session_id}'"
+SESSION_FILTER_TRACES = (
+    "| where ${session_id:singlequote} == '__all__' "
+    "or tostring(Properties['session.id']) == ${session_id:singlequote}"
+)
+SESSION_FILTER_DEPS = (
+    "| where ${session_id:singlequote} == '__all__' "
+    "or tostring(Properties['session.id']) == ${session_id:singlequote}"
+)
 
 
 # ── queries ───────────────────────────────────────────────────────────
@@ -155,8 +167,11 @@ Q_META_USER = f"""AppTraces
 | where $__timeFilter(TimeGenerated)
 {SESSION_FILTER_TRACES}
 | extend email = tostring(Properties['user.email']), proj = tostring(Properties['project.name'])
-| summarize email=any(email), proj=any(proj)
-| extend display = iff(isempty(proj), email, strcat(email, ' • ', proj))
+| summarize users = dcount(email), projects = dcount(proj),
+            email = any(email), proj = any(proj)
+| extend display = iff(${{session_id:singlequote}} == '__all__',
+                       strcat(users, ' users • ', projects, ' projects'),
+                       iff(isempty(proj), email, strcat(email, ' • ', proj)))
 | project display
 """
 
@@ -195,18 +210,23 @@ Q_PROMPTS = f"""AppDependencies
 | extend full_prompt = tostring(Properties['user_prompt']),
          prompt_len = toint(Properties['user_prompt_length']),
          seq = toint(Properties['interaction.sequence']),
-         status_code = tostring(Properties['otel.status_code'])
+         status_code = tostring(Properties['otel.status_code']),
+         email = tostring(Properties['user.email']),
+         sess = tostring(Properties['session.id'])
 | extend preview = iff(strlen(full_prompt) > 140,
                        strcat(substring(full_prompt, 0, 140), '…'),
                        full_prompt)
 | project ['#'] = seq,
           started = TimeGenerated,
+          user = email,
+          prompt = preview,
+          session_short = substring(sess, 0, 8),
           duration_ms = DurationMs,
           chars = prompt_len,
           status_code,
           OperationId,
-          prompt = preview
-| order by started asc
+          SessionId = sess
+| order by started desc
 """
 
 # Row 4 — span search. Default (empty $search) returns ALL spans for the
@@ -245,6 +265,74 @@ Q_TOOL_STATS = f"""AppDependencies
 | order by total_ms desc
 """
 
+# Row 3 — conversation thread. Interleaves the three event types that
+# carry conversation content, ordered by event.sequence (per-session
+# monotonic):
+#   - user_prompt        → user message (Properties['prompt'])
+#   - api_response_body  → assistant turn. Body is the full Anthropic API
+#                          response JSON; we mv-expand the content[] array
+#                          and pull out 'text' blocks (assistant text) and
+#                          'tool_use' blocks (one-line summary).
+#   - tool_result        → tool execution outcome (success/error + duration
+#                          + truncated tool_input)
+#
+# Scoped to one session (returns 0 rows in All-sessions mode — a cross-
+# session interleave would just be noise).
+#
+# Requires OTEL_LOG_RAW_API_BODIES=1 in the client's settings.json["env"]
+# for assistant text to appear; without it the api_response_body events
+# don't get emitted.
+Q_CONVERSATION = """let sf = ${session_id:singlequote};
+let user_turns = AppTraces
+| where $__timeFilter(TimeGenerated)
+| where sf != '__all__'
+| where tostring(Properties['session.id']) == sf
+| where tostring(Properties['event.name']) == 'user_prompt'
+| extend seq = toint(Properties['event.sequence']),
+         pid = tostring(Properties['prompt.id']),
+         role = '🧑 user',
+         content = tostring(Properties['prompt'])
+| project TimeGenerated, seq, pid, role, content;
+let assistant_turns = AppTraces
+| where $__timeFilter(TimeGenerated)
+| where sf != '__all__'
+| where tostring(Properties['session.id']) == sf
+| where tostring(Properties['event.name']) == 'api_response_body'
+| extend seq = toint(Properties['event.sequence']),
+         pid = tostring(Properties['prompt.id']),
+         body_obj = parse_json(tostring(Properties['body']))
+| mv-expand blk = body_obj.content
+| extend block_text = case(
+    tostring(blk.type) == 'text', tostring(blk.text),
+    tostring(blk.type) == 'tool_use',
+        strcat('🔨 calling ', tostring(blk.name), '(',
+               substring(tostring(blk.input), 0, 200), ')'),
+    strcat('[', tostring(blk.type), ' block]'))
+| summarize content = strcat_array(make_list(block_text), '\\n\\n')
+            by TimeGenerated, seq, pid
+| extend role = '🤖 assistant'
+| project TimeGenerated, seq, pid, role, content;
+let tool_turns = AppTraces
+| where $__timeFilter(TimeGenerated)
+| where sf != '__all__'
+| where tostring(Properties['session.id']) == sf
+| where tostring(Properties['event.name']) == 'tool_result'
+| extend seq = toint(Properties['event.sequence']),
+         pid = tostring(Properties['prompt.id']),
+         tn = tostring(Properties['tool_name']),
+         success = tostring(Properties['success']),
+         dur = tostring(Properties['duration_ms']),
+         input_preview = substring(tostring(Properties['tool_input']), 0, 600),
+         result_size = tostring(Properties['tool_result_size_bytes'])
+| extend role = strcat('🔧 ', tn),
+         content = strcat('[success=', success, ' · ', dur, 'ms · result_size=',
+                          result_size, 'B]\\n', input_preview)
+| project TimeGenerated, seq, pid, role, content;
+union user_turns, assistant_turns, tool_turns
+| order by seq asc
+| project started = TimeGenerated, ['#'] = seq, role, content, prompt_id = pid
+"""
+
 Q_ERRORS = f"""union
   (AppDependencies
    | where $__timeFilter(TimeGenerated)
@@ -276,7 +364,7 @@ PROMPTS_OPID_DATALINK = {
             "value": [
                 {
                     "title": "Load this prompt's trace ↓",
-                    "url": "/d/agent-otel-session-trace?${__url_time_range}&var-session_id=${session_id}&var-operation_id=${__data.fields.OperationId}",
+                    "url": "/d/agent-otel-session-trace?${__url_time_range}&var-session_id=${__data.fields.SessionId}&var-operation_id=${__data.fields.OperationId}",
                     "targetBlank": False,
                 }
             ],
@@ -391,27 +479,78 @@ prompts_panel["fieldConfig"]["overrides"] = [
 ]
 panels.append(prompts_panel)
 
-# Row 3 — trace waterfall
-panels.append(row("🌳 Trace for selected prompt", y=17))
+# Row 3 — conversation thread
+panels.append(
+    row(
+        "🗣️ Conversation thread — pick a session above (only shown when scoped to one session)",
+        y=17,
+    )
+)
+conv_panel = table_panel(
+    next_id(),
+    "Conversation",
+    0,
+    18,
+    24,
+    22,
+    Q_CONVERSATION,
+    description=(
+        "Interleaved user prompts, assistant responses, and tool calls "
+        "from the selected session, ordered by event.sequence. Assistant "
+        "text is parsed from api_response_body events — requires "
+        "OTEL_LOG_RAW_API_BODIES=1 in the client's settings.json. "
+        "Tool result content is NOT captured (only size); tool_input "
+        "(args) is shown truncated to 600 chars."
+    ),
+)
+conv_panel["fieldConfig"]["overrides"] = [
+    {
+        "matcher": {"id": "byName", "options": "content"},
+        "properties": [
+            {"id": "custom.cellOptions", "value": {"type": "auto", "wrapText": True}},
+            {"id": "custom.minWidth", "value": 600},
+        ],
+    },
+    {
+        "matcher": {"id": "byName", "options": "role"},
+        "properties": [{"id": "custom.width", "value": 140}],
+    },
+    {
+        "matcher": {"id": "byName", "options": "#"},
+        "properties": [{"id": "custom.width", "value": 60}],
+    },
+    {
+        "matcher": {"id": "byName", "options": "started"},
+        "properties": [{"id": "custom.width", "value": 180}],
+    },
+    {
+        "matcher": {"id": "byName", "options": "prompt_id"},
+        "properties": [{"id": "custom.width", "value": 280}],
+    },
+]
+panels.append(conv_panel)
+
+# Row 4 — trace waterfall
+panels.append(row("🌳 Trace for selected prompt", y=40))
 panels.append(
     trace_panel(
         next_id(),
         "Trace waterfall",
         0,
-        18,
+        41,
         24,
         22,
         description="Click a row in the prompts table above to populate $operation_id. Then this panel renders the full span tree (claude_code.interaction → llm_request → tool → tool.execution) as a collapsible waterfall.",
     )
 )
 
-# Row 4 — span search
-panels.append(row("🔎 Span search across the whole session", y=40))
+# Row 5 — span search
+panels.append(row("🔎 Span search across the whole session", y=63))
 search_panel = table_panel(
     next_id(),
     "Spans (filtered by $search)",
     0,
-    41,
+    64,
     24,
     14,
     Q_SPAN_SEARCH,
@@ -432,14 +571,14 @@ search_panel["fieldConfig"]["overrides"] = [
 ]
 panels.append(search_panel)
 
-# Row 5 — drill-downs
-panels.append(row("📊 Tool usage & errors", y=55))
+# Row 6 — drill-downs
+panels.append(row("📊 Tool usage & errors", y=78))
 panels.append(
     table_panel(
         next_id(),
         "Tool usage breakdown",
         0,
-        56,
+        79,
         12,
         10,
         Q_TOOL_STATS,
@@ -451,7 +590,7 @@ panels.append(
         next_id(),
         "Errors & rejected tools",
         12,
-        56,
+        79,
         12,
         10,
         Q_ERRORS,
@@ -507,7 +646,7 @@ dashboard = {
                 "name": "session_id",
                 "type": "query",
                 "label": "Session",
-                "description": "Recent sessions (last 7 days) ordered by start time. Label format: <email> · <date> · <prompt_count>p. Only sessions that have at least one claude_code.interaction span (i.e., emitted with beta tracing on) appear here.",
+                "description": "Default 'All sessions' shows every claude_code.interaction in the time range. Pick a specific session to scope drill-downs and the trace waterfall. Label format: <email> · <date> · <prompt_count>p (last 7 days, top 100 by recency).",
                 "datasource": AZURE_DS,
                 "query": {
                     "queryType": "Azure Log Analytics",
@@ -532,42 +671,20 @@ dashboard = {
                     },
                     "refId": "session_id",
                 },
-                "refresh": 2,
+                "refresh": 1,
                 "multi": False,
-                "includeAll": False,
-                "current": {"selected": False, "text": "", "value": ""},
+                "includeAll": True,
+                "allValue": "__all__",
+                "current": {"selected": True, "text": "All", "value": "__all__"},
                 "hide": 0,
                 "skipUrlSync": False,
             },
             {
                 "name": "operation_id",
-                "type": "query",
+                "type": "textbox",
                 "label": "Operation ID",
-                "description": "Auto-populated from interactions in the selected session, newest first. Default selection is the most recent prompt's trace; click any other prompt row to switch.",
-                "datasource": AZURE_DS,
-                "query": {
-                    "queryType": "Azure Log Analytics",
-                    "azureLogAnalytics": {
-                        "query": (
-                            "AppDependencies\n"
-                            "| where TimeGenerated > ago(7d)\n"
-                            "| where Name == 'claude_code.interaction'\n"
-                            "| where tostring(Properties['session.id']) == '${session_id}'\n"
-                            "| extend seq = toint(Properties['interaction.sequence']),\n"
-                            "         preview = substring(tostring(Properties['user_prompt']), 0, 60)\n"
-                            "| order by TimeGenerated desc\n"
-                            "| take 50\n"
-                            "| project __value = OperationId,\n"
-                            "          __text = strcat('#', seq, ' · ', preview)"
-                        ),
-                        "resource": LA_RESOURCE_VAR,
-                        "resultFormat": "table",
-                    },
-                    "refId": "operation_id",
-                },
-                "refresh": 2,
-                "multi": False,
-                "includeAll": False,
+                "description": "Empty by default — the trace waterfall stays empty until you click a row in the Prompts table to load that prompt's trace. You can also paste an OperationId here directly.",
+                "query": "",
                 "current": {"selected": False, "text": "", "value": ""},
                 "hide": 0,
                 "skipUrlSync": False,
