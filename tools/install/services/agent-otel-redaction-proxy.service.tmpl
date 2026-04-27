@@ -1,0 +1,39 @@
+# systemd user unit for the agent-otel redaction proxy.
+#
+# Lives at ~/.config/systemd/user/agent-otel-redaction-proxy.service after
+# install.sh substitutes the {{...}} placeholders.
+#
+# Enable + start with:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now agent-otel-redaction-proxy
+#
+# Survives logout (so the proxy keeps running headless) only if you also
+# run once: `loginctl enable-linger $USER`. Without that, systemd-user
+# stops the unit when your last login session ends — fine for laptops
+# where you only need redaction during interactive Claude Code use.
+
+[Unit]
+Description=agent-otel local OTLP redaction proxy
+Documentation=https://github.com/kamiwaza-ai/agent-otel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart={{LAUNCHER}}
+WorkingDirectory={{INSTALL_DIR}}
+Restart=on-failure
+RestartSec=5
+# StartLimitBurst applies if the unit fails StartLimitBurst times within
+# StartLimitIntervalSec — guards against tight crash loops.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+StandardOutput=append:{{LOG_DIR}}/redaction-proxy.out.log
+StandardError=append:{{LOG_DIR}}/redaction-proxy.err.log
+
+# Resource limits — privacy-filter (q4f16) needs ~2.4 GB RSS. Cap RAM to
+# something generous but bounded so a runaway can't OOM the user session.
+MemoryMax=4G
+
+[Install]
+WantedBy=default.target

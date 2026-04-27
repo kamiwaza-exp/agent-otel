@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<!--
+  Windows Task Scheduler XML for the agent-otel redaction proxy.
+
+  Imported by install.ps1 with `Register-ScheduledTask -Xml ...` after
+  the {{...}} placeholders are substituted.
+
+  Why a Scheduled Task instead of a Windows Service:
+    - Services need admin to install. Scheduled tasks at-logon don't.
+    - The proxy is per-user state (reads ~\.claude\settings.json env,
+      writes per-user logs) so a user-mode task is the right scope.
+    - Restart-on-failure is configured below via Settings/RestartOnFailure.
+
+  Triggered at logon. Runs only when the same user is logged in. If you
+  want it to survive logoff, switch to a Windows Service install path
+  (out of scope here — would need NSSM or sc.exe and admin).
+-->
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>agent-otel local OTLP redaction proxy</Description>
+    <Author>{{USER}}</Author>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <UserId>{{USER}}</UserId>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>{{USER}}</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+    <RestartOnFailure>
+      <Interval>PT10S</Interval>
+      <Count>5</Count>
+    </RestartOnFailure>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>powershell.exe</Command>
+      <Arguments>-NoProfile -ExecutionPolicy Bypass -File "{{LAUNCHER}}"</Arguments>
+      <WorkingDirectory>{{INSTALL_DIR}}</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

@@ -45,6 +45,9 @@ loki_data/
 tmp/
 temp/
 
+# Local Claude Code session state (per-user, not part of the repo)
+.claude/
+
 # Azure deployment outputs — m1-outputs.json embeds the App Insights
 # InstrumentationKey (a real credential). Regenerate locally with:
 #   az deployment group show -g <rg> -n <m1-deployment> --query properties.outputs > infra/m1-outputs.json
