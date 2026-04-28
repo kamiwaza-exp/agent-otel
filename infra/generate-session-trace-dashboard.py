@@ -143,20 +143,29 @@ def row(title, y, collapsed=False):
 
 # ── shared filter clauses ─────────────────────────────────────────────
 #
-# session_id supports an "All sessions" option (sentinel value `__all__`,
+# session_id supports an "All sessions" option (sentinel value `'all'`,
 # set as the variable's allValue). When that sentinel is selected the
 # session predicate becomes a no-op so the dashboard shows every
 # interaction in the current time range. Otherwise the filter narrows to
 # the picked session.
 
-SESSION_FILTER_TRACES = (
-    "| where ${session_id:singlequote} == '__all__' "
+# When the user picks "All" on the session_id variable, Grafana substitutes
+# the variable's allValue verbatim — the :singlequote formatter is BYPASSED
+# for allValue (documented Grafana behavior). So we bake the quotes into
+# allValue itself: allValue = "'all'" (5 chars: '-a-l-l-').  That way the
+# substitution produces a valid quoted KQL string literal in either case.
+_SESSION_PRED = (
+    "${session_id:singlequote} == 'all' "
     "or tostring(Properties['session.id']) == ${session_id:singlequote}"
 )
-SESSION_FILTER_DEPS = (
-    "| where ${session_id:singlequote} == '__all__' "
-    "or tostring(Properties['session.id']) == ${session_id:singlequote}"
-)
+# $users is a multi-select query variable (allValue: None, formatter
+# :doublequote) — same shape as the User Profile dashboard. The
+# :doublequote formatter expands one or more selected values as
+# "val1","val2",... so the result is always a valid KQL `in` argument.
+_USER_PRED = "tostring(Properties['user.email']) in (${users:doublequote})"
+
+SESSION_FILTER_TRACES = f"| where ({_SESSION_PRED}) and {_USER_PRED}"
+SESSION_FILTER_DEPS = f"| where ({_SESSION_PRED}) and {_USER_PRED}"
 
 
 # ── queries ───────────────────────────────────────────────────────────
@@ -169,7 +178,7 @@ Q_META_USER = f"""AppTraces
 | extend email = tostring(Properties['user.email']), proj = tostring(Properties['project.name'])
 | summarize users = dcount(email), projects = dcount(proj),
             email = any(email), proj = any(proj)
-| extend display = iff(${{session_id:singlequote}} == '__all__',
+| extend display = iff(${{session_id:singlequote}} == 'all',
                        strcat(users, ' users • ', projects, ' projects'),
                        iff(isempty(proj), email, strcat(email, ' • ', proj)))
 | project display
@@ -237,8 +246,8 @@ Q_PROMPTS = f"""AppDependencies
 Q_SPAN_SEARCH = f"""AppDependencies
 | where $__timeFilter(TimeGenerated)
 {SESSION_FILTER_DEPS}
-| extend props_text = tostring(Properties)
-| where '${{search}}' == '' or Name contains_cs '${{search}}' or props_text contains_cs '${{search}}'
+| extend props_text = tostring(Properties), q = '${{search}}'
+| where isempty(q) or Name contains q or props_text contains q
 | extend tool = tostring(Properties['tool_name']),
          model = tostring(Properties['gen_ai.request.model']),
          status_code = tostring(Properties['otel.status_code']),
@@ -285,7 +294,7 @@ Q_TOOL_STATS = f"""AppDependencies
 Q_CONVERSATION = """let sf = ${session_id:singlequote};
 let user_turns = AppTraces
 | where $__timeFilter(TimeGenerated)
-| where sf != '__all__'
+| where sf != 'all'
 | where tostring(Properties['session.id']) == sf
 | where tostring(Properties['event.name']) == 'user_prompt'
 | extend seq = toint(Properties['event.sequence']),
@@ -295,7 +304,7 @@ let user_turns = AppTraces
 | project TimeGenerated, seq, pid, role, content;
 let assistant_turns = AppTraces
 | where $__timeFilter(TimeGenerated)
-| where sf != '__all__'
+| where sf != 'all'
 | where tostring(Properties['session.id']) == sf
 | where tostring(Properties['event.name']) == 'api_response_body'
 | extend seq = toint(Properties['event.sequence']),
@@ -314,7 +323,7 @@ let assistant_turns = AppTraces
 | project TimeGenerated, seq, pid, role, content;
 let tool_turns = AppTraces
 | where $__timeFilter(TimeGenerated)
-| where sf != '__all__'
+| where sf != 'all'
 | where tostring(Properties['session.id']) == sf
 | where tostring(Properties['event.name']) == 'tool_result'
 | extend seq = toint(Properties['event.sequence']),
@@ -643,28 +652,115 @@ dashboard = {
                 "skipUrlSync": False,
             },
             {
-                "name": "session_id",
+                "name": "users",
                 "type": "query",
-                "label": "Session",
-                "description": "Default 'All sessions' shows every claude_code.interaction in the time range. Pick a specific session to scope drill-downs and the trace waterfall. Label format: <email> · <date> · <prompt_count>p (last 7 days, top 100 by recency).",
+                "label": "Users",
+                "description": "Multi-select on user.email. 'All' expands to every distinct email seen in the last 90 days. Pick one or more to scope the rest of the dashboard (cascades into Sessions and every per-session panel).",
                 "datasource": AZURE_DS,
                 "query": {
                     "queryType": "Azure Log Analytics",
                     "azureLogAnalytics": {
                         "query": (
-                            "AppDependencies\n"
+                            "AppTraces\n"
+                            "| where TimeGenerated > ago(90d)\n"
+                            "| extend email = tostring(Properties['user.email'])\n"
+                            "| where isnotempty(email)\n"
+                            "| summarize last_seen = max(TimeGenerated) by email\n"
+                            "| order by last_seen desc\n"
+                            "| project email"
+                        ),
+                        "resource": LA_RESOURCE_VAR,
+                        "resultFormat": "table",
+                    },
+                    "refId": "users",
+                },
+                "refresh": 2,
+                "multi": True,
+                "includeAll": True,
+                "allValue": None,
+                "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
+                "hide": 0,
+                "skipUrlSync": False,
+            },
+            {
+                "name": "hosts",
+                "type": "query",
+                "label": "Hosts",
+                "description": "Multi-select on host.name (the launcher-attributed machine that emitted the session). 'All' = every host. Cascades into the Sessions dropdown so you only see sessions from the picked machines.",
+                "datasource": AZURE_DS,
+                "query": {
+                    "queryType": "Azure Log Analytics",
+                    "azureLogAnalytics": {
+                        "query": (
+                            "AppTraces\n"
+                            "| where TimeGenerated > ago(90d)\n"
+                            "| where tostring(Properties['event.name']) == 'user_prompt'\n"
+                            "| extend host = tostring(Properties['host.name'])\n"
+                            "| where isnotempty(host)\n"
+                            "| summarize last_seen = max(TimeGenerated) by host\n"
+                            "| order by last_seen desc\n"
+                            "| project host"
+                        ),
+                        "resource": LA_RESOURCE_VAR,
+                        "resultFormat": "table",
+                    },
+                    "refId": "hosts",
+                },
+                "refresh": 2,
+                "multi": True,
+                "includeAll": True,
+                "allValue": None,
+                "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
+                "hide": 0,
+                "skipUrlSync": False,
+            },
+            {
+                "name": "session_id",
+                "type": "query",
+                "label": "Session",
+                "description": "Sessions matching the selected Users + Hosts, last 7 days, newest 100. Label format: <project> · <date time> · \"<first prompt preview>\". Default 'All sessions' shows every interaction in the time range. The underlying value is the session UUID — the human-readable label is just for picking.",
+                "datasource": AZURE_DS,
+                "query": {
+                    "queryType": "Azure Log Analytics",
+                    "azureLogAnalytics": {
+                        # We query user_prompt events (not interaction spans)
+                        # because user_prompt carries host.name and project.name
+                        # — the dimensions the user wants to filter / display
+                        # by. arg_min(seq, prompt) returns the prompt at the
+                        # smallest event.sequence per session, i.e. the
+                        # session's first user-typed message — the most
+                        # identifying thing about a conversation.
+                        "query": (
+                            "AppTraces\n"
                             "| where TimeGenerated > ago(7d)\n"
-                            "| where Name == 'claude_code.interaction'\n"
+                            "| where tostring(Properties['event.name']) == 'user_prompt'\n"
                             "| extend email = tostring(Properties['user.email']),\n"
-                            "         sess = tostring(Properties['session.id'])\n"
+                            "         hostnm = tostring(Properties['host.name']),\n"
+                            "         proj = tostring(Properties['project.name']),\n"
+                            "         sess = tostring(Properties['session.id']),\n"
+                            "         prompt = tostring(Properties['prompt']),\n"
+                            "         seq = toint(Properties['event.sequence'])\n"
                             "| where isnotempty(sess)\n"
-                            "| summarize first_seen = min(TimeGenerated), prompts = count() by sess, email\n"
+                            "| where email in (${users:doublequote})\n"
+                            "| where hostnm in (${hosts:doublequote})\n"
+                            # arg_min(seq, prompt) returns seq (not prompt)
+                            # in this Kusto dialect, so pre-sort and use
+                            # make_list with limit=1 to get a deterministic
+                            # first prompt per session.
+                            "| order by seq asc\n"
+                            "| summarize first_seen = min(TimeGenerated),\n"
+                            "            first_prompts = make_list(prompt, 1)\n"
+                            "            by sess, proj, hostnm, email\n"
+                            "| extend first_prompt = tostring(first_prompts[0])\n"
                             "| order by first_seen desc\n"
                             "| take 100\n"
+                            "| extend preview = iff(strlen(first_prompt) > 60,\n"
+                            "                       strcat(substring(first_prompt, 0, 60), '…'),\n"
+                            "                       first_prompt)\n"
                             "| project __value = sess,\n"
-                            "          __text = strcat(email, ' · ',\n"
-                            "                          format_datetime(first_seen, 'yy-MM-dd HH:mm'),\n"
-                            "                          ' · ', prompts, 'p')"
+                            "          __text = strcat(coalesce(proj, '(no project)'), ' · ',\n"
+                            "                          format_datetime(first_seen, 'MM-dd HH:mm'),\n"
+                            "                          ' · \"', preview, '\"')"
                         ),
                         "resource": LA_RESOURCE_VAR,
                         "resultFormat": "table",
@@ -674,8 +770,11 @@ dashboard = {
                 "refresh": 1,
                 "multi": False,
                 "includeAll": True,
-                "allValue": "__all__",
-                "current": {"selected": True, "text": "All", "value": "__all__"},
+                # allValue carries embedded single quotes so KQL receives a
+                # valid quoted string literal even when Grafana bypasses
+                # :singlequote for the allValue substitution.
+                "allValue": "'all'",
+                "current": {"selected": True, "text": "All", "value": "'all'"},
                 "hide": 0,
                 "skipUrlSync": False,
             },
@@ -693,7 +792,7 @@ dashboard = {
                 "name": "search",
                 "type": "textbox",
                 "label": "Span search",
-                "description": "Case-sensitive substring match across span name and all properties. Empty = show all spans.",
+                "description": "Case-insensitive substring match across span Name and the full Properties JSON. Empty = show all spans within the current Sessions/Users/Hosts scope.",
                 "query": "",
                 "current": {"selected": False, "text": "", "value": ""},
                 "hide": 0,
